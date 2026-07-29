@@ -11,3 +11,11 @@ yarn-debug.log*
 yarn-error.log*
 dev.stdout.log
 dev.stderr.log
+
+# OpenNext
+.open-next
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example

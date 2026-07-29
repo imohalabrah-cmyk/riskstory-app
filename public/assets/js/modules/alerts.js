@@ -1,0 +1,1 @@
+function renderAlerts(){alertList.innerHTML=[['SPY','Gamma level touched','740'],['SPX','Trinity conflict','7425'],['QQQ','Sweep premium above','$1M']].map(function(a){return '<div class="alert"><b>'+a[0]+' • '+a[1]+'</b><span>Trigger: '+a[2]+' | Status: armed</span></div>'}).join('')}

@@ -69,7 +69,7 @@ function percentile(values: number[], ratio: number) {
 function thresholdProfile(
   symbol: string,
   currentLevels: OpenInterestLevel[],
-  history: ReturnType<typeof getOpenInterestCalibration>,
+  history: Awaited<ReturnType<typeof getOpenInterestCalibration>>,
 ): OpenInterestThresholds {
   const baseline = BASELINES[symbol] || BASELINES.SPY;
   const sessionCount = Math.min(CALIBRATION_TARGET, history.sessionCount + 1);
@@ -89,7 +89,7 @@ function thresholdProfile(
 }
 
 async function referenceRead(symbol: string, contractDate: string) {
-  const stored = getStoredReference(symbol, contractDate);
+  const stored = await getStoredReference(symbol, contractDate);
   if (contractDate !== riyadhDate()) {
     return stored.price > 0
       ? stored
@@ -157,7 +157,7 @@ function scenario(
   return `السعر المرجعي ${price(referencePrice)} ونافذة التحليل ±${windowPoints} نقطة. ${supportText}. ${resistanceText}. ${magnetText}. يلزم تأكيد من حركة السعر؛ OI وحده لا يحدد اتجاه المراكز، وهذه القراءة ليست توصية تداول.`;
 }
 
-function buildSummary(
+async function buildSummary(
   contractDate: string,
   symbol: TrackedSymbol,
   rows: OccSeriesRow[],
@@ -172,7 +172,7 @@ function buildSummary(
   const allPuts = rankedLevels(exactRows, "put");
   if (!allCalls.length || !allPuts.length) throw new Error(`OCC rows for ${symbol.symbol} do not contain both Call and Put OI`);
   const allLevels = [...allCalls, ...allPuts];
-  const history = getOpenInterestCalibration(symbol.symbol, contractDate, CALIBRATION_TARGET - 1);
+  const history = await getOpenInterestCalibration(symbol.symbol, contractDate, CALIBRATION_TARGET - 1);
   const thresholds = thresholdProfile(symbol.symbol, allLevels, history);
   const reactionMap = buildReactionMap({
     symbol: symbol.symbol,
@@ -228,7 +228,7 @@ function buildSummary(
 
 export async function syncOpenInterest(requestedDate?: string) {
   const contractDate = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : riyadhDate();
-  const symbols = listTrackedSymbols();
+  const symbols = await listTrackedSymbols();
   const verifiedAt = new Date().toISOString();
   const saved: DailyOpenInterestSummary[] = [];
   const errors: string[] = [];
@@ -241,18 +241,18 @@ export async function syncOpenInterest(requestedDate?: string) {
     return buildSummary(contractDate, symbol, occ.rows, occ.sourceUrl, verifiedAt, reference);
   }));
 
-  results.forEach((result, index) => {
+  for (const [index, result] of results.entries()) {
     if (result.status === "fulfilled") {
-      saveOccContractSummary(result.value.summary, result.value.allLevels);
+      await saveOccContractSummary(result.value.summary, result.value.allLevels);
       saved.push(result.value.summary);
     } else {
       const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
       errors.push(`${symbols[index].symbol}: ${reason}`);
     }
-  });
+  }
 
   const status = saved.length === symbols.length ? "complete" : saved.length ? "partial" : "pending";
-  recordSyncRun(contractDate, status, symbols.length, saved.length, errors.join(" | ") || "OCC contract synchronization completed");
+  await recordSyncRun(contractDate, status, symbols.length, saved.length, errors.join(" | ") || "OCC contract synchronization completed");
   return {
     summaryDate: contractDate,
     status,
@@ -262,12 +262,12 @@ export async function syncOpenInterest(requestedDate?: string) {
   };
 }
 
-export function readOpenInterestDashboard(date?: string): OpenInterestDashboard {
-  const result = getDailySummaries(date);
+export async function readOpenInterestDashboard(date?: string): Promise<OpenInterestDashboard> {
+  const result = await getDailySummaries(date);
   return {
     schemaVersion: "2.2",
     summaryDate: result.summaryDate,
-    availableDates: listSummaryDates(),
+    availableDates: await listSummaryDates(),
     summaries: result.summaries,
     generatedAt: new Date().toISOString(),
     source: "OCC Series Search",

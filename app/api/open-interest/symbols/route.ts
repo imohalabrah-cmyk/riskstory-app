@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  return NextResponse.json({ symbols: listTrackedSymbols() }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ symbols: await listTrackedSymbols() }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid symbol or asset type" }, { status: 400 });
   }
   const occQueryType = body.occQueryType === "U" ? "U" : "O";
-  upsertTrackedSymbol({
+  await upsertTrackedSymbol({
     symbol,
     displayName: String(body.displayName || symbol),
     assetType,
@@ -27,12 +27,12 @@ export async function POST(request: Request) {
     occQuerySymbol: String(body.occQuerySymbol || symbol).trim().toUpperCase(),
     occProductSymbol: String(body.occProductSymbol || symbol).trim().toUpperCase(),
   });
-  return NextResponse.json({ symbols: listTrackedSymbols() });
+  return NextResponse.json({ symbols: await listTrackedSymbols() });
 }
 
 export async function DELETE(request: Request) {
   const symbol = String(new URL(request.url).searchParams.get("symbol") || "").trim().toUpperCase();
   if (!symbol) return NextResponse.json({ error: "Symbol is required" }, { status: 400 });
-  deactivateTrackedSymbol(symbol);
-  return NextResponse.json({ symbols: listTrackedSymbols() });
+  await deactivateTrackedSymbol(symbol);
+  return NextResponse.json({ symbols: await listTrackedSymbols() });
 }

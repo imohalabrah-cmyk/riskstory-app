@@ -11,6 +11,13 @@
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"
 	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "risk-story-open-interest",
+			"database_id": "local-risk-story-open-interest"
+		}
+	],
 	"services": [
 		{
 			// Self-reference service binding, the service name must match the worker name

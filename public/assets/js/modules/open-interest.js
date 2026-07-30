@@ -172,8 +172,15 @@ function paintOpenInterest(data){
     if(data.availableDates&&data.availableDates.length){dateInput.min=data.availableDates[data.availableDates.length-1];dateInput.max=data.availableDates[0]}
   }
   if(!data.summaries||!data.summaries.length){
-    status.innerHTML='<div class="oiStatusItem warning"><span>حالة عقد '+oiEscape(data.summaryDate||state.oiDate||'اليوم')+'</span><b>لم تُحفظ بيانات OCC لهذا التاريخ بعد</b><small>لا يتم استبدالها بأرقام يوم آخر أو بمصدر مختلف.</small></div>';
-    cards.innerHTML='<div class="surfaceEmpty"><strong>بيانات العقد غير متاحة</strong><span>شغّل التحديث للتحقق من نشر OCC لبيانات هذا التاريخ.</span></div>';
+    var publication=data.publication||{},isEarly=publication.state==='early';
+    status.innerHTML='<div class="oiStatusItem warning"><span>حالة عقد '+oiEscape(data.summaryDate||state.oiDate||'اليوم')+'</span><b>'+(isEarly?'قراءة مبكرة غير معتمدة':'لم تُحفظ بيانات OCC المعتمدة لهذا التاريخ بعد')+'</b><small>'+(isEarly?'يبدأ الاعتماد بعد 06:00 صباحاً بتوقيت الرياض.':'لا يتم استبدالها بأرقام يوم آخر أو بمصدر مختلف.')+'</small></div>';
+    cards.innerHTML='<div class="surfaceEmpty"><strong>'+(isEarly?'بانتظار نافذة OCC الرسمية':'بيانات العقد غير متاحة')+'</strong><span>'+(isEarly?'سيصبح التحقق متاحاً تلقائياً عند الساعة 06:00 صباحاً بتوقيت الرياض.':'سيتم التحقق تلقائياً من OCC، ويمكنك أيضاً تشغيل التحديث يدوياً.')+'</span></div>';
+    var syncButton=document.getElementById('oiSync');
+    if(syncButton){syncButton.disabled=isEarly;syncButton.textContent=isEarly?'متاح بعد 06:00':'تحديث من OCC'}
+    if(!isEarly&&publication.canSync&&state.oiAutoSyncDate!==publication.contractDate){
+      state.oiAutoSyncDate=publication.contractDate;
+      setTimeout(function(){syncOpenInterestDashboard(true)},0);
+    }
     return;
   }
   var verified=data.summaries.reduce(function(latest,item){return !latest||item.lastVerifiedAt>latest?item.lastVerifiedAt:latest},'');
@@ -209,10 +216,10 @@ function renderOpenInterest(){
   else loadOpenInterest(state.oiDate||'',false);
 }
 
-function syncOpenInterestDashboard(){
+function syncOpenInterestDashboard(automatic){
   var button=document.getElementById('oiSync');
   if(button){button.disabled=true;button.textContent='جاري التحقق من OCC...'}
-  showToast('Checking the exact OCC contract data...');
+  if(!automatic)showToast('Checking the exact OCC contract data...');
   return fetch('/api/open-interest/sync',{method:'POST',cache:'no-store'}).then(function(response){
     return response.json().then(function(body){if(!response.ok)throw new Error(body.error||'Synchronization failed');return body});
   }).then(function(result){
@@ -222,7 +229,7 @@ function syncOpenInterestDashboard(){
       else showToast('OCC reaction map verified - '+result.saved.length+' symbols');
     });
   }).catch(function(error){
-    showToast('OCC update failed: '+(error.message||error));
+    if(!automatic)showToast('OCC update failed: '+(error.message||error));
   }).finally(function(){if(button){button.disabled=false;button.textContent='تحديث من OCC'}});
 }
 

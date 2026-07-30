@@ -22,6 +22,7 @@ import type {
 } from "./types";
 
 const CALIBRATION_TARGET = 20;
+const OCC_PUBLICATION_HOUR_RIYADH = 6;
 
 const BASELINES: Record<string, { watch: number; strong: number; major: number }> = {
   SPX: { watch: 5_000, strong: 8_000, major: 12_000 },
@@ -38,6 +39,40 @@ function riyadhDate(now = new Date()) {
   }).formatToParts(now);
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
+}
+
+function riyadhClock(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    date: `${value.year}-${value.month}-${value.day}`,
+    hour: Number(value.hour),
+  };
+}
+
+function publicationCutoff(contractDate: string) {
+  return `${contractDate}T03:00:00.000Z`;
+}
+
+export class OccPublicationPendingError extends Error {
+  contractDate: string;
+  notBefore: string;
+
+  constructor(contractDate: string) {
+    super(`OCC data for ${contractDate} is not accepted before 06:00 Asia/Riyadh`);
+    this.name = "OccPublicationPendingError";
+    this.contractDate = contractDate;
+    this.notBefore = publicationCutoff(contractDate);
+  }
 }
 
 function rankedLevels(rows: OccSeriesRow[], side: OpenInterestSide): OpenInterestLevel[] {
@@ -228,6 +263,10 @@ async function buildSummary(
 
 export async function syncOpenInterest(requestedDate?: string) {
   const contractDate = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : riyadhDate();
+  const clock = riyadhClock();
+  if (contractDate === clock.date && clock.hour < OCC_PUBLICATION_HOUR_RIYADH) {
+    throw new OccPublicationPendingError(contractDate);
+  }
   const symbols = await listTrackedSymbols();
   const verifiedAt = new Date().toISOString();
   const saved: DailyOpenInterestSummary[] = [];
@@ -264,12 +303,32 @@ export async function syncOpenInterest(requestedDate?: string) {
 
 export async function readOpenInterestDashboard(date?: string): Promise<OpenInterestDashboard> {
   const result = await getDailySummaries(date);
+  const clock = riyadhClock();
+  const contractDate = date || result.summaryDate || clock.date;
+  const notBefore = publicationCutoff(contractDate);
+  const isToday = contractDate === clock.date;
+  const isEarly = isToday && clock.hour < OCC_PUBLICATION_HOUR_RIYADH;
+  const verifiedSummaries = isEarly
+    ? []
+    : result.summaries.filter((summary) => (
+      !isToday || new Date(summary.lastVerifiedAt).getTime() >= new Date(notBefore).getTime()
+    ));
+  const verifiedAt = verifiedSummaries.reduce<string | null>((latest, summary) => (
+    !latest || summary.lastVerifiedAt > latest ? summary.lastVerifiedAt : latest
+  ), null);
   return {
     schemaVersion: "2.2",
-    summaryDate: result.summaryDate,
+    summaryDate: contractDate,
     availableDates: await listSummaryDates(),
-    summaries: result.summaries,
+    summaries: verifiedSummaries,
     generatedAt: new Date().toISOString(),
     source: "OCC Series Search",
+    publication: {
+      contractDate,
+      state: isEarly ? "early" : verifiedSummaries.length ? "verified" : "ready",
+      notBefore,
+      verifiedAt,
+      canSync: !isEarly,
+    },
   };
 }

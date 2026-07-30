@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { syncOpenInterest } from "../../../lib/open-interest/service";
+import { OccPublicationPendingError, syncOpenInterest } from "../../../lib/open-interest/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,6 +16,14 @@ async function synchronize(request: Request) {
     const date = new URL(request.url).searchParams.get("date") || undefined;
     return NextResponse.json(await syncOpenInterest(date), { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof OccPublicationPendingError) {
+      return NextResponse.json({
+        error: "بيانات OCC اليومية لا تُعتمد قبل 06:00 صباحاً بتوقيت الرياض.",
+        code: "OCC_PUBLICATION_PENDING",
+        contractDate: error.contractDate,
+        notBefore: error.notBefore,
+      }, { status: 425, headers: { "Cache-Control": "no-store" } });
+    }
     return NextResponse.json({ error: error instanceof Error ? error.message : "Open-interest sync failed" }, { status: 500 });
   }
 }

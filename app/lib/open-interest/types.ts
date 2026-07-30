@@ -110,4 +110,11 @@ export type OpenInterestDashboard = {
   summaries: DailyOpenInterestSummary[];
   generatedAt: string;
   source: "OCC Series Search";
+  publication: {
+    contractDate: string;
+    state: "early" | "ready" | "verified";
+    notBefore: string;
+    verifiedAt: string | null;
+    canSync: boolean;
+  };
 };

@@ -7,6 +7,12 @@
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
+	"triggers": {
+		"crons": [
+			"5 3 * * *",
+			"20 3 * * *"
+		]
+	},
 	"assets": {
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"

@@ -36,8 +36,8 @@
     }
     var script = document.createElement('script');
     script.src = modules[index].indexOf('@vendor/')===0
-      ? '/assets/vendor/' + modules[index].slice(8) + '?v=20260801ux3'
-      : '/assets/js/modules/' + modules[index] + '?v=20260801ux3';
+      ? '/assets/vendor/' + modules[index].slice(8) + '?v=20260801ux4'
+      : '/assets/js/modules/' + modules[index] + '?v=20260801ux4';
     script.async = false;
     script.onload = function(){ load(index + 1); };
     script.onerror = function(){ console.error('Failed to load Risk Story module', modules[index]); };

@@ -225,8 +225,10 @@ function renderProfessionalChart(id,mount,context){
     rightPriceScale:{borderColor:'rgba(148,177,218,.16)',scaleMargins:{top:.08,bottom:.2}},
     timeScale:{borderColor:'rgba(148,177,218,.16)',timeVisible:true,secondsVisible:false,rightOffset:5,barSpacing:11,minBarSpacing:4},
     crosshair:{mode:L.CrosshairMode.Normal,vertLine:{color:'rgba(25,217,255,.5)',labelBackgroundColor:'#164a66'},horzLine:{color:'rgba(25,217,255,.35)',labelBackgroundColor:'#164a66'}},
-    handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:true},
-    handleScale:{axisPressedMouseMove:true,mouseWheel:true,pinch:true},
+    // Vertical wheel and one-finger vertical gestures belong to the page.
+    // The chart keeps horizontal drag, axis drag, and pinch interactions.
+    handleScroll:{mouseWheel:false,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},
+    handleScale:{axisPressedMouseMove:true,mouseWheel:false,pinch:true},
   });
   var candleSeries=chart.addSeries(L.CandlestickSeries,{upColor:'#20e27b',downColor:'#ff456b',wickUpColor:'#20e27b',wickDownColor:'#ff456b',borderVisible:false,priceLineVisible:false,lastValueVisible:true});
   candleSeries.setData(candles.map(function(candle){return {time:candle.time,open:candle.open,high:candle.high,low:candle.low,close:candle.close}}));

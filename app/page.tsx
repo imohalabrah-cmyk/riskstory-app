@@ -31,7 +31,7 @@ export default function Home() {
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: renderedMarkup }} />
-      <Script src="/assets/js/app.js?v=20260801ux3" strategy="afterInteractive" />
+      <Script src="/assets/js/app.js?v=20260801ux4" strategy="afterInteractive" />
     </>
   );
 }

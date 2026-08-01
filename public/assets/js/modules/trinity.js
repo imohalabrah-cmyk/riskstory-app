@@ -69,19 +69,25 @@ function renderTri(id){
 
 function initializeTrinityInteraction(mount){
   var lists=Array.from(mount.querySelectorAll('[data-tri-list]'));
-  var syncing=false,frame=0,sourceList=null;
+  var expectedPositions=new WeakMap(),frame=0,sourceList=null;
   lists.forEach(function(list){
     list.addEventListener('scroll',function(){
-      if(syncing||state.trinityLinked===false)return;
+      var expected=expectedPositions.get(list);
+      if(expected!==undefined&&Math.abs(list.scrollTop-expected)<1){expectedPositions.delete(list);return}
+      expectedPositions.delete(list);
+      if(state.trinityLinked===false)return;
       sourceList=list;
       if(frame)return;
       frame=requestAnimationFrame(function(){
         frame=0;
         if(!sourceList)return;
         var max=Math.max(1,sourceList.scrollHeight-sourceList.clientHeight),ratio=sourceList.scrollTop/max;
-        syncing=true;
-        lists.forEach(function(other){if(other!==sourceList)other.scrollTop=ratio*Math.max(0,other.scrollHeight-other.clientHeight)});
-        syncing=false;
+        lists.forEach(function(other){
+          if(other===sourceList)return;
+          var next=ratio*Math.max(0,other.scrollHeight-other.clientHeight);
+          expectedPositions.set(other,next);
+          other.scrollTop=next;
+        });
       });
     },{passive:true});
   });

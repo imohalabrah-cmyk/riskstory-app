@@ -553,20 +553,60 @@ document.addEventListener('focusout',function(event){
 var chartDrag=null,chartDragFrame=0;
 document.addEventListener('pointerdown',function(event){
   var viewport=event.target.closest('.chartViewport');
-  if(viewport){chartDrag={viewport:viewport,x:event.clientX,pan:state.chartPan||0};viewport.classList.add('dragging');return}
-  var wrap=event.target.closest('.heatTableViewport');
-  if(wrap&&event.target.closest('.heatVirtualTrack')&&!event.target.closest('button,input,select,a')){heatDrag={wrap:wrap,x:event.clientX,y:event.clientY,left:wrap.scrollLeft,top:wrap.scrollTop};wrap.classList.add('is-dragging')}
+  if(viewport&&event.pointerType!=='touch'&&event.button===0){
+    chartDrag={viewport:viewport,pointerId:event.pointerId,x:event.clientX,currentX:event.clientX,pan:state.chartPan||0};
+    viewport.classList.add('dragging');
+    if(viewport.setPointerCapture)viewport.setPointerCapture(event.pointerId);
+    return;
+  }
+  var wrap=event.target.closest('.heatTableViewport,.heatwrap,.tablewrap,.gammaTableWrap,.gammaLadderScroll,.triProList');
+  if(wrap&&event.pointerType!=='touch'&&event.button===0&&!event.target.closest('button,input,select,a,[contenteditable="true"]')){
+    heatDrag={wrap:wrap,pointerId:event.pointerId,x:event.clientX,y:event.clientY,currentX:event.clientX,currentY:event.clientY,left:wrap.scrollLeft,top:wrap.scrollTop};
+    wrap.classList.add('is-dragging');
+    if(wrap.setPointerCapture)wrap.setPointerCapture(event.pointerId);
+  }
 });
 document.addEventListener('pointermove',function(event){
-  if(chartDrag&&!chartDragFrame){var chartX=event.clientX;chartDragFrame=requestAnimationFrame(function(){chartDragFrame=0;var next=clampChartPan(chartDrag.pan-Math.round((chartX-chartDrag.x)/38));if(next!==state.chartPan){state.chartFollowLatest=false;state.chartPan=next;renderActiveCharts()}})}
-  if(heatDrag&&!heatFrame){var heatX=event.clientX,heatY=event.clientY;heatFrame=requestAnimationFrame(function(){heatFrame=0;heatDrag.wrap.scrollLeft=heatDrag.left-(heatX-heatDrag.x);heatDrag.wrap.scrollTop=heatDrag.top-(heatY-heatDrag.y)})}
+  if(chartDrag){
+    chartDrag.currentX=event.clientX;
+    if(!chartDragFrame)chartDragFrame=requestAnimationFrame(function(){
+      chartDragFrame=0;
+      if(!chartDrag)return;
+      var next=clampChartPan(chartDrag.pan-Math.round((chartDrag.currentX-chartDrag.x)/38));
+      if(next!==state.chartPan){state.chartFollowLatest=false;state.chartPan=next;renderActiveCharts()}
+    });
+  }
+  if(heatDrag){
+    heatDrag.currentX=event.clientX;heatDrag.currentY=event.clientY;
+    heatDrag.wrap.scrollLeft=heatDrag.left-(heatDrag.currentX-heatDrag.x);
+    heatDrag.wrap.scrollTop=heatDrag.top-(heatDrag.currentY-heatDrag.y);
+  }
 });
-document.addEventListener('pointerup',function(){if(chartDrag)chartDrag.viewport.classList.remove('dragging');chartDrag=null;if(heatDrag)heatDrag.wrap.classList.remove('is-dragging');heatDrag=null});
-document.addEventListener('pointercancel',function(){chartDrag=null;heatDrag=null});
+function endSurfaceDrag(event){
+  if(chartDrag){
+    chartDrag.currentX=event&&Number.isFinite(event.clientX)?event.clientX:chartDrag.currentX;
+    var finalPan=clampChartPan(chartDrag.pan-Math.round((chartDrag.currentX-chartDrag.x)/38));
+    if(finalPan!==state.chartPan){state.chartFollowLatest=false;state.chartPan=finalPan;renderActiveCharts()}
+    chartDrag.viewport.classList.remove('dragging');
+    if(chartDrag.viewport.releasePointerCapture&&chartDrag.viewport.hasPointerCapture&&chartDrag.viewport.hasPointerCapture(chartDrag.pointerId))chartDrag.viewport.releasePointerCapture(chartDrag.pointerId);
+  }
+  if(heatDrag){
+    heatDrag.currentX=event&&Number.isFinite(event.clientX)?event.clientX:heatDrag.currentX;
+    heatDrag.currentY=event&&Number.isFinite(event.clientY)?event.clientY:heatDrag.currentY;
+    heatDrag.wrap.scrollLeft=heatDrag.left-(heatDrag.currentX-heatDrag.x);
+    heatDrag.wrap.scrollTop=heatDrag.top-(heatDrag.currentY-heatDrag.y);
+    heatDrag.wrap.classList.remove('is-dragging');
+    if(heatDrag.wrap.releasePointerCapture&&heatDrag.wrap.hasPointerCapture&&heatDrag.wrap.hasPointerCapture(heatDrag.pointerId))heatDrag.wrap.releasePointerCapture(heatDrag.pointerId);
+  }
+  if(chartDragFrame){cancelAnimationFrame(chartDragFrame);chartDragFrame=0}
+  chartDrag=null;heatDrag=null;
+}
+document.addEventListener('pointerup',endSurfaceDrag);
+document.addEventListener('pointercancel',endSurfaceDrag);
 
-var heatDrag=null,heatFrame=0,wheelFrame=0;
+var heatDrag=null,wheelFrame=0;
 document.addEventListener('wheel',function(event){
-  var viewport=event.target.closest('.chartViewport');
+  var viewport=event.target.closest('.chartViewport,.tvChartViewport');
   if(!viewport||(!event.ctrlKey&&!event.shiftKey&&Math.abs(event.deltaX)<=Math.abs(event.deltaY)))return;
   event.preventDefault();
   if(event.ctrlKey)state.chartZoom=Math.max(.65,Math.min(2.6,(state.chartZoom||1)+(event.deltaY<0?.15:-.15)));

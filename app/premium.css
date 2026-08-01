@@ -1510,6 +1510,129 @@ button svg,
   }
 }
 
+/* Interaction stability: one page scroller, predictable nested surfaces, and
+   gestures that behave the same in every workspace. */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden !important;
+}
+
+.app {
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.main {
+  height: 100dvh !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.workspace {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-x: none !important;
+  overscroll-behavior-y: auto !important;
+  scroll-behavior: auto !important;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tablewrap,
+.heatwrap,
+.heatTableViewport,
+.gammaTableWrap,
+.gammaLadderScroll,
+.triProList,
+.levels,
+.modalBody {
+  overscroll-behavior-x: contain !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tablewrap,
+.heatwrap,
+.heatTableViewport,
+.gammaTableWrap,
+.gammaLadderScroll,
+.triProList {
+  touch-action: pan-x pan-y;
+  cursor: grab;
+}
+
+.tablewrap.is-dragging,
+.heatwrap.is-dragging,
+.heatTableViewport.is-dragging,
+.gammaTableWrap.is-dragging,
+.gammaLadderScroll.is-dragging,
+.triProList.is-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.tvChartViewport,
+.chartViewport {
+  overscroll-behavior: auto !important;
+  touch-action: pan-y pinch-zoom;
+}
+
+.tvChartCanvas {
+  touch-action: pan-y pinch-zoom;
+}
+
+@media (max-width: 1180px) {
+  body,
+  .app,
+  .main {
+    overflow: hidden !important;
+  }
+
+  .app,
+  .main {
+    height: 100dvh !important;
+    min-height: 0 !important;
+  }
+
+  .workspace {
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .main {
+    height: calc(100dvh - 64px) !important;
+  }
+
+  .nativeChartStage,
+  .modalBody .nativeChartStage {
+    min-width: 0 !important;
+    width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(500px, 68dvh) auto !important;
+    overflow: visible !important;
+  }
+
+  .tvChartViewport,
+  .modalBody .tvChartViewport {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 500px !important;
+  }
+
+  .nativeChartStage > .levels {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

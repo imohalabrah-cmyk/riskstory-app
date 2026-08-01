@@ -13,6 +13,7 @@ const renderedMarkup = appMarkup
   .replace("Live style prototype for gamma, heatmap, flow, and Trinity reads.", "Provider-backed gamma, heatmap, chart, and Trinity workspace.")
   .replace("Realtime Options Flow", "Options Flow")
   .replace("Live Feed", "Sync Feed")
+  .replace('<div class="chips"><button id="zin" class="chip active">Zoom +</button><button id="zout" class="chip">Zoom -</button><button class="chip" data-heat-exp="all">All Expirations</button></div>', '')
   .replace(
     '<button class="chip" data-chart-action="draw">Draw</button>',
     '<button class="chip" data-chart-action="draw">Draw</button><button class="chip chartEditControl" data-chart-action="undo" title="Undo last user level | تراجع عن آخر خط" aria-label="Undo last user level" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5M5 12h8a6 6 0 0 1 6 6"/></svg></button><button class="chip chartEditControl danger" data-chart-action="clear" title="Clear all user levels | حذف كل الخطوط اليدوية" aria-label="Clear all user levels" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>',
@@ -30,7 +31,7 @@ export default function Home() {
   return (
     <>
       <div dangerouslySetInnerHTML={{ __html: renderedMarkup }} />
-      <Script src="/assets/js/app.js?v=20260728draw1" strategy="afterInteractive" />
+      <Script src="/assets/js/app.js?v=20260801ux3" strategy="afterInteractive" />
     </>
   );
 }

@@ -1,4 +1,16 @@
-var state={view:'command',mini:'all',flowAsset:'all',flowType:'all',min:250000,zoom:1,lang:'en',gammaMode:'net',exposureMode:'gex',heatMode:'GEX',heatTheme:'pro',heatRange:'All Expirations',heatAll:false,heatSelectedExpirations:[],heatDatePreset:'all',heatLayout:'compare',heatStrikeRange:'near',heatScale:'percentile',heatMobileExpiry:'',chartZoom:1,chartPan:0,chartFollowLatest:true,chartFrame:'10m',chartDrawings:{},drawMode:false,showIndicators:true,commandRange:'0DTE',oiDate:'',oiData:null,oiLoading:false,oiAutoSyncDate:'',candles:{},candleStatus:{provider:'unavailable',market:'unavailable',updatedAt:null,message:'Waiting for provider candles.'},flowStatus:{provider:'unavailable',market:'unavailable',updatedAt:null,message:'A dedicated options-flow provider is not connected.'},apiStatus:{market:'unavailable',flow:'unavailable',provider:'unavailable',updatedAt:null,lastSymbol:'SPY',lastRange:'0DTE',message:'Waiting for MarketData.'}};
+var state={view:'command',mini:'all',flowAsset:'all',flowType:'all',min:250000,zoom:1,lang:'en',gammaMode:'net',exposureMode:'gex',heatMode:'GEX',heatTheme:'pro',heatRange:'All Expirations',heatAll:false,heatSelectedExpirations:[],heatDatePreset:'all',heatLayout:'compare',heatStrikeRange:'near',heatScale:'percentile',heatMobileExpiry:'',heatSettingsOpen:false,statusOpen:false,trinityLinked:true,trinityPending:{},chartZoom:1,chartPan:0,chartFollowLatest:true,chartFrame:'10m',chartDrawings:{},drawMode:false,showIndicators:true,commandRange:'0DTE',oiDate:'',oiData:null,oiLoading:false,oiAutoSyncDate:'',candles:{},candleStatus:{provider:'unavailable',market:'unavailable',updatedAt:null,message:'Waiting for provider candles.'},flowStatus:{provider:'unavailable',market:'unavailable',updatedAt:null,message:'A dedicated options-flow provider is not connected.'},apiStatus:{market:'unavailable',flow:'unavailable',provider:'unavailable',updatedAt:null,lastSymbol:'SPY',lastRange:'0DTE',message:'Waiting for MarketData.'}};
+
+function uiIcon(name,label,size){
+  return '<i data-lucide="'+String(name||'circle')+'" aria-hidden="true" style="width:'+(size||16)+'px;height:'+(size||16)+'px"></i>'+(label?'<span class="srOnly">'+String(label)+'</span>':'');
+}
+
+function refreshUiIcons(root){
+  if(!window.lucide||typeof window.lucide.createIcons!=='function')return;
+  window.lucide.createIcons({attrs:{'stroke-width':'1.8'},nameAttr:'data-lucide',root:root||document});
+}
+
+window.uiIcon=uiIcon;
+window.refreshUiIcons=refreshUiIcons;
 var top100='SPX,SPY,QQQ,IWM,DIA,NVDA,TSLA,AAPL,MSFT,META,AMZN,GOOGL,AMD,AVGO,NFLX,PLTR,SMCI,MSTR,COIN,MARA,RIOT,INTC,MU,CRM,ORCL,ADBE,SHOP,UBER,ABNB,PYPL,SQ,JPM,BAC,GS,MS,XLF,XLE,XLK,XLV,XLY,XLP,XLI,XLU,XLB,XLC,TLT,HYG,LQD,GLD,SLV,USO,TSM,BABA,NKE,COST,WMT,HD,LOW,DIS,V,MA,UNH,LLY,MRNA,PFE,BA,CAT,DE,GE,GM,F,RIVN,LCID,ENPH,SEDG,SNOW,NET,DDOG,CRWD,PANW,NOW,ROKU,ZM,RBLX,HOOD,SOFI,AFRM,CVX,OXY,XOM,NIO,LI,XPEV,TQQQ,SQQQ,SOXL,SOXS,UVXY,VIX,SMH,ARKK'.split(',');
 var expiries=['0DTE','0DTE','Jul 1','Jul 2','Jul 6','Jul 7','Jul 10','Jul 17','Jul 24','Jul 31'];var expiriesAll=['0DTE','0DTE','Jul 1','Jul 2','Jul 6','Jul 7','Jul 8','Jul 9','Jul 10','Jul 13','Jul 17','Jul 24','Jul 31','Aug 7','Aug 14','Aug 21'];
 var strikes=[];for(var i=0;i<24;i++)strikes.push(748-i);

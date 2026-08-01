@@ -288,9 +288,19 @@ function openExpand(id){
   var clone=source.closest('.panel')?source.closest('.panel').cloneNode(true):source.cloneNode(true);
   clone.querySelectorAll('.expand').forEach(function(button){button.remove()});
   var expandedChartId=null;
+  var expandedHeatId=null;
+  var expandedTriId=null;
   if(/Chart$/.test(id)){
     var clonedStage=clone.id===id?clone:clone.querySelector('#'+id);
     if(clonedStage){expandedChartId=id+'Expanded';clonedStage.id=expandedChartId;clonedStage.innerHTML=''}
+  }
+  if(id.indexOf('hm')===0){
+    var clonedHeat=clone.id===id?clone:clone.querySelector('#'+id);
+    if(clonedHeat){expandedHeatId=id+'Expanded';clonedHeat.id=expandedHeatId;clonedHeat.innerHTML=''}
+  }
+  if(id.indexOf('tri')===0){
+    var clonedTri=clone.id===id?clone:clone.querySelector('#'+id);
+    if(clonedTri){expandedTriId=id+'Expanded';clonedTri.id=expandedTriId;clonedTri.innerHTML=''}
   }
   modalBody.appendChild(clone);
   modal.classList.add('open');
@@ -298,6 +308,9 @@ function openExpand(id){
   document.body.classList.add('modal-open');
   requestAnimationFrame(function(){
     if(expandedChartId)renderChart(expandedChartId);
+    if(expandedHeatId)renderHeat(expandedHeatId);
+    if(expandedTriId)renderTri(expandedTriId);
+    if(window.refreshUiIcons)window.refreshUiIcons(modalBody);
     closeModal.focus();
   });
 }
@@ -314,12 +327,12 @@ function closeExpand(){
 
 function refreshExpand(){
   if(!modal.classList.contains('open')||!state.expandedId)return;
-  var scrollBox=modalBody.querySelector('.tvChartViewport,.chartViewport,.heatwrap,.triProList,.tablewrap');
+  var scrollBox=modalBody.querySelector('.tvChartViewport,.chartViewport,.heatTableViewport,.heatwrap,.triProList,.tablewrap');
   var top=scrollBox?scrollBox.scrollTop:0,left=scrollBox?scrollBox.scrollLeft:0;
   var id=state.expandedId;
   openExpand(id);
   requestAnimationFrame(function(){
-    var next=modalBody.querySelector('.chartViewport,.heatwrap,.triProList,.tablewrap');
+    var next=modalBody.querySelector('.chartViewport,.heatTableViewport,.heatwrap,.triProList,.tablewrap');
     if(next){next.scrollTop=top;next.scrollLeft=left}
   });
 }
@@ -342,7 +355,9 @@ function updateSelectedLevel(level){
 
 loginForm.addEventListener('submit',function(event){
   event.preventDefault();
-  if(username.value.trim()==='mohammed'&&password.value==='riskstory'){
+  var usernameInput=document.getElementById('username');
+  var passwordInput=document.getElementById('password');
+  if(usernameInput.value.trim()==='mohammed'&&passwordInput.value==='riskstory'){
     login.classList.add('hidden');app.classList.remove('hidden');loginError.classList.add('hidden');boot();applyTickerChange();
   }else loginError.classList.remove('hidden');
 });
@@ -382,6 +397,25 @@ document.addEventListener('click',function(event){
   var market=target.closest('.btn.good');
   if(market){if(state.view==='openInterest'){syncOpenInterestDashboard();return}applyTickerChange({forceHeatmap:true});return}
   if(target.closest('#oiSync')){syncOpenInterestDashboard();return}
+  var statusToggle=target.closest('[data-status-toggle]');
+  if(statusToggle){
+    state.statusOpen=!state.statusOpen;
+    var statusHost=statusToggle.closest('.dataTrustBar');
+    statusToggle.setAttribute('aria-expanded',state.statusOpen?'true':'false');
+    var statusMenu=statusHost&&statusHost.querySelector('.systemStatusMenu');
+    if(statusMenu)statusMenu.classList.toggle('open',state.statusOpen);
+    return;
+  }
+  var heatSettings=target.closest('[data-heat-settings]');
+  if(heatSettings){
+    state.heatSettingsOpen=!state.heatSettingsOpen;
+    heatSettings.classList.toggle('active',state.heatSettingsOpen);
+    heatSettings.setAttribute('aria-expanded',state.heatSettingsOpen?'true':'false');
+    var settingsHost=heatSettings.closest('.proHeatmap');
+    var settingsMenu=settingsHost&&settingsHost.querySelector('.matrixSettingsMenu');
+    if(settingsMenu)settingsMenu.classList.toggle('open',state.heatSettingsOpen);
+    return;
+  }
   var heatMode=target.closest('[data-heat-mode]');
   if(heatMode){applyHeatModeButton(heatMode);return}
   var heatTheme=target.closest('[data-heat-theme]');
@@ -455,7 +489,7 @@ document.addEventListener('click',function(event){
     lists.filter(Boolean).forEach(function(list){list.scrollBy({top:direction,behavior:'smooth'})});return;
   }
   var triSync=target.closest('[data-tri-sync]');
-  if(triSync){state.trinityLinked=state.trinityLinked===false;triSync.classList.toggle('active',state.trinityLinked);triSync.textContent=state.trinityLinked?'Linked navigation':'Independent navigation';return}
+  if(triSync){state.trinityLinked=state.trinityLinked===false;triSync.classList.toggle('active',state.trinityLinked);triSync.setAttribute('aria-pressed',state.trinityLinked?'true':'false');triSync.innerHTML=uiIcon(state.trinityLinked?'link':'unlink','',14)+'<span>'+(state.trinityLinked?'Linked':'Independent')+'</span>';if(window.refreshUiIcons)window.refreshUiIcons(triSync);return}
   var miniFlow=target.closest('[data-mini]');
   if(miniFlow){setActiveButton(miniFlow);state.mini=miniFlow.getAttribute('data-mini');renderFlow('flowMini',true);return}
   if(target.closest('#applyFlow')){state.flowAsset=flowAsset.value;state.flowType=flowType.value;state.min=Number(minPremium.value||0);renderFlow('flowRows',false);showToast('Flow filters applied');return}
@@ -476,9 +510,10 @@ document.addEventListener('click',function(event){
   if(riskLevel){updateSelectedLevel(riskLevel);return}
   var replay=target.closest('[data-replay]');
   if(replay){var actionReplay=replay.getAttribute('data-replay');state.replayStep=Number(state.replayStep||2);if(actionReplay==='prev')state.replayStep=Math.max(0,state.replayStep-1);else state.replayStep=Math.min(5,state.replayStep+1);renderActiveCharts();return}
-  if(target.closest('#lang')){state.lang=state.lang==='ar'?'en':'ar';app.className='app '+state.lang;document.documentElement.dir=state.lang==='ar'?'rtl':'ltr';showToast('Language view: '+state.lang.toUpperCase());return}
+  if(target.closest('#lang')){state.lang=state.lang==='ar'?'en':'ar';app.className='app '+state.lang;document.documentElement.dir=state.lang==='ar'?'rtl':'ltr';state.renderRevision=Number(state.renderRevision||0)+1;renderView(state.view);if(typeof renderDataTrustBar==='function')renderDataTrustBar();refreshExpand();showToast('Language view: '+state.lang.toUpperCase());return}
   if(target.closest('#addAlert')){var row=document.createElement('div');row.className='alert';row.innerHTML='<b>'+alertSymbol.value+' - '+alertCondition.value+'</b><span>Trigger: '+alertValue.value+' | Status: armed</span>';alertList.prepend(row);showToast('Alert armed');return}
   if(target===modal)closeExpand();
+  if(state.statusOpen&&!target.closest('.dataTrustBar')){state.statusOpen=false;var menu=document.querySelector('.systemStatusMenu');if(menu)menu.classList.remove('open')}
 });
 
 document.addEventListener('keydown',function(event){if(event.key==='Escape'&&modal.classList.contains('open'))closeExpand()});
@@ -519,8 +554,8 @@ var chartDrag=null,chartDragFrame=0;
 document.addEventListener('pointerdown',function(event){
   var viewport=event.target.closest('.chartViewport');
   if(viewport){chartDrag={viewport:viewport,x:event.clientX,pan:state.chartPan||0};viewport.classList.add('dragging');return}
-  var wrap=event.target.closest('.heatwrap');
-  if(wrap&&event.target.closest('.heatBoardCanvas')&&!event.target.closest('button,input,select,a')){heatDrag={wrap:wrap,x:event.clientX,y:event.clientY,left:wrap.scrollLeft,top:wrap.scrollTop};wrap.classList.add('is-dragging')}
+  var wrap=event.target.closest('.heatTableViewport');
+  if(wrap&&event.target.closest('.heatVirtualTrack')&&!event.target.closest('button,input,select,a')){heatDrag={wrap:wrap,x:event.clientX,y:event.clientY,left:wrap.scrollLeft,top:wrap.scrollTop};wrap.classList.add('is-dragging')}
 });
 document.addEventListener('pointermove',function(event){
   if(chartDrag&&!chartDragFrame){var chartX=event.clientX;chartDragFrame=requestAnimationFrame(function(){chartDragFrame=0;var next=clampChartPan(chartDrag.pan-Math.round((chartX-chartDrag.x)/38));if(next!==state.chartPan){state.chartFollowLatest=false;state.chartPan=next;renderActiveCharts()}})}

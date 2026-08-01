@@ -37,6 +37,7 @@ function renderView(view){
   }
   state.renderedViews=state.renderedViews||{};
   state.renderedViews[view]=Number(state.renderRevision||0);
+  if(window.refreshUiIcons)window.refreshUiIcons(document.getElementById(view)||document);
 }
 
 var viewRenderFrame=0;
@@ -97,6 +98,14 @@ function boot(){
   document.querySelectorAll('button').forEach(function(button){
     if(!button.getAttribute('type'))button.setAttribute('type','button');
   });
+  var navIcons={command:'layout-dashboard',gamma:'gauge',heatmap:'table-properties',trinity:'boxes',flow:'activity',chart:'chart-candlestick',openInterest:'chart-no-axes-combined',alerts:'bell'};
+  document.querySelectorAll('.nav button[data-view]').forEach(function(button){
+    var view=button.getAttribute('data-view'),label=button.getAttribute('title')||view;
+    button.innerHTML=uiIcon(navIcons[view]||'circle',label,20);
+    button.setAttribute('aria-label',label);
+  });
+  document.querySelectorAll('.expand').forEach(function(button){button.innerHTML=uiIcon('maximize-2','',16);button.setAttribute('aria-label',button.title||'Expand')});
+  if(window.logout){logout.innerHTML=uiIcon('log-out','',18);logout.setAttribute('aria-label','Logout')}
   modal.setAttribute('role','dialog');
   modal.setAttribute('aria-modal','true');
   modal.setAttribute('aria-hidden','true');
@@ -106,4 +115,5 @@ function boot(){
   var refresh=document.querySelector('.btn.good');
   if(refresh)refresh.id='refreshMarket';
   setView(state.view||'command',{top:true});
+  if(window.refreshUiIcons)window.refreshUiIcons(document);
 }

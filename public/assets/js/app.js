@@ -10,6 +10,7 @@
     '<div class="hero wide"><span>Interactive Chart</span><strong class="purple">Pan, zoom, and inspect</strong><span>Explore provider candles with calculated positioning levels.</span></div>'
   ].join('');
   var modules = [
+    '@vendor/lucide.js',
     '@vendor/lightweight-charts.js',
     'state-data.js',
     'data-source.js',
@@ -30,12 +31,13 @@
     if(index >= modules.length){
       var intro = document.querySelector('.login-card p');
       if(intro) intro.textContent = 'Private workspace access. Provider-backed reads only; unavailable feeds stay clearly marked.';
+      if(window.refreshUiIcons)window.refreshUiIcons(document);
       return;
     }
     var script = document.createElement('script');
     script.src = modules[index].indexOf('@vendor/')===0
-      ? '/assets/vendor/' + modules[index].slice(8) + '?v=5.2.0'
-      : '/assets/js/modules/' + modules[index] + '?v=20260728draw1';
+      ? '/assets/vendor/' + modules[index].slice(8) + '?v=20260801ux3'
+      : '/assets/js/modules/' + modules[index] + '?v=20260801ux3';
     script.async = false;
     script.onload = function(){ load(index + 1); };
     script.onerror = function(){ console.error('Failed to load Risk Story module', modules[index]); };

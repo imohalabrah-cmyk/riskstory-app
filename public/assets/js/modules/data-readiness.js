@@ -49,11 +49,20 @@ function renderDataTrustBar(){
   var source=window.riskStoryDataSource||riskStoryDataSource;
   var symbol=(document.getElementById('ticker')&&document.getElementById('ticker').value)||state.symbol||'SPY';
   var snap=source.getSnapshot(symbol);
-  host.innerHTML=['market','candles','gamma','heatmap','flow'].map(function(surface){
+  var reads=['market','candles','gamma','heatmap','flow'].map(function(surface){
     var read=dataSurfaceReadiness(surface,snap);
     var detail=(surface==='market'||surface==='candles'||surface==='flow')?readinessModeLabel(read.mode):read.methodLabel;
-    return '<span class="dataTrustChip '+readinessText(read.mode)+' method-'+readinessText(read.method)+'" title="'+readinessText(read.note)+'"><b>'+readinessText(read.label)+'</b><i>'+readinessText(detail)+'</i></span>';
-  }).join('');
+    return {surface:surface,read:read,detail:detail};
+  });
+  var problems=reads.filter(function(item){return item.read.mode!=='live'}).length;
+  var worst=reads.some(function(item){return item.read.mode==='unavailable'})?'unavailable':reads.some(function(item){return item.read.mode==='delayed'})?'delayed':'live';
+  var isArabic=state.lang==='ar';
+  host.innerHTML='<button type="button" class="systemStatusButton '+worst+'" data-status-toggle aria-expanded="'+(state.statusOpen?'true':'false')+'" title="'+(isArabic?'تفاصيل حالة البيانات':'Data source details')+'">'+
+      uiIcon(worst==='live'?'circle-check':worst==='delayed'?'clock-3':'circle-alert','',15)+'<span>'+(isArabic?'حالة البيانات':'Data status')+'</span><b>'+problems+'</b>'+uiIcon('chevron-down','',13)+'</button>'+
+    '<div class="systemStatusMenu'+(state.statusOpen?' open':'')+'" role="status">'+reads.map(function(item){
+      return '<article><span class="statusDot '+readinessText(item.read.mode)+'"></span><div><b>'+readinessText(item.read.label)+'</b><small>'+readinessText(item.detail)+' · '+readinessText(item.read.provider)+'</small></div><p>'+readinessText(item.read.note)+'</p></article>';
+    }).join('')+'</div>';
+  if(window.refreshUiIcons)window.refreshUiIcons(host);
 }
 
 window.dataSurfaceReadiness=dataSurfaceReadiness;

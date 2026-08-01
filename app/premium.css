@@ -588,10 +588,10 @@ select:hover,
 }
 
 #triFull.trinityPro {
-  height: auto !important;
+  height: clamp(650px, calc(100dvh - 170px), 780px) !important;
   min-height: 670px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: auto;
+  grid-template-rows: auto minmax(0, 1fr);
   align-items: stretch;
   padding: 12px;
   gap: 10px;
@@ -746,6 +746,386 @@ select:hover,
 
 .heatCell {
   font-size: 10px;
+}
+
+/* 2026 workspace refinement: calm hierarchy, native virtualization, unified controls. */
+.srOnly{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  padding:0!important;
+  margin:-1px!important;
+  overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;
+  white-space:nowrap!important;
+  border:0!important;
+}
+
+button svg,
+.btn svg,
+.chip svg,
+.expand svg{
+  display:block;
+  flex:0 0 auto;
+}
+
+.chip,
+.btn,
+.expand,
+.heatSegment button,
+.heatExpiryChoice,
+.triIcon,
+.matrixSettingsButton,
+.systemStatusButton{
+  transition:background-color .14s ease,border-color .14s ease,color .14s ease,transform .08s ease;
+}
+
+.chip:active,
+.btn:active,
+.expand:active,
+.heatSegment button:active,
+.heatExpiryChoice:active,
+.triIcon:active,
+.matrixSettingsButton:active,
+.systemStatusButton:active{
+  transform:translateY(1px);
+}
+
+.dataTrustBar{
+  position:relative;
+  width:max-content;
+  max-width:100%;
+  margin-top:7px;
+}
+
+.systemStatusButton{
+  height:27px;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  border:1px solid rgba(148,177,218,.15);
+  border-radius:6px;
+  padding:0 8px;
+  background:#0a1521;
+  color:#a9b9cc;
+  font-size:9px;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.systemStatusButton>svg:first-child{color:#ffdc63}
+.systemStatusButton.live>svg:first-child{color:#25d9ae}
+.systemStatusButton.unavailable>svg:first-child{color:#ff6785}
+.systemStatusButton b{
+  min-width:18px;
+  height:18px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:rgba(255,255,255,.06);
+  color:#e9f2fc;
+  font-size:8px;
+}
+
+.systemStatusMenu{
+  position:absolute;
+  z-index:80;
+  top:33px;
+  left:0;
+  width:min(430px,calc(100vw - 24px));
+  display:none;
+  overflow:hidden;
+  border:1px solid rgba(148,177,218,.18);
+  border-radius:8px;
+  background:rgba(7,15,25,.98);
+  box-shadow:0 18px 48px rgba(0,0,0,.42);
+}
+
+.systemStatusMenu.open{display:block}
+.systemStatusMenu article{
+  min-height:49px;
+  display:grid;
+  grid-template-columns:8px minmax(105px,.55fr) minmax(150px,1fr);
+  gap:9px;
+  align-items:center;
+  padding:8px 10px;
+  border-bottom:1px solid rgba(148,177,218,.08);
+}
+.systemStatusMenu article:last-child{border-bottom:0}
+.systemStatusMenu article div{display:grid;gap:2px}
+.systemStatusMenu article b{color:#dce8f5;font-size:10px}
+.systemStatusMenu article small,.systemStatusMenu article p{margin:0;color:#758aa3;font-size:8px;line-height:1.35}
+.statusDot{width:7px;height:7px;border-radius:50%;background:#ff5f80}
+.statusDot.delayed{background:#f6cf55}.statusDot.live{background:#21d5a9}
+
+#heatmap>.panel{
+  min-height:calc(100dvh - 118px);
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+}
+
+#heatmap .heatwrap{
+  min-height:0;
+  overflow:visible;
+}
+
+.proHeatmap,
+.modalBody .proHeatmap{
+  min-width:0!important;
+  width:100%;
+  padding:10px!important;
+}
+
+.heatTerminal{
+  display:grid!important;
+  grid-template-columns:minmax(170px,.55fr) minmax(430px,1.4fr) auto!important;
+  gap:10px!important;
+  align-items:center;
+  margin:0 0 10px!important;
+  padding:0 0 10px!important;
+  border-bottom:1px solid rgba(148,177,218,.08);
+}
+
+.heatTerminalActions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:7px;
+  min-width:0;
+}
+
+.matrixSettingsButton{
+  height:31px;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  border:1px solid rgba(148,177,218,.16);
+  border-radius:6px;
+  padding:0 9px;
+  background:#0a1521;
+  color:#9fb1c7;
+  font-size:9px;
+  font-weight:900;
+  white-space:nowrap;
+  cursor:pointer;
+}
+.matrixSettingsButton:hover,.matrixSettingsButton.active{border-color:rgba(40,205,226,.42);color:#dffbff;background:rgba(25,178,202,.08)}
+
+.heatStudio{
+  position:relative;
+  display:grid;
+  gap:9px;
+  margin-bottom:10px;
+  padding:9px!important;
+  border:0!important;
+  border-radius:7px!important;
+  background:#0a1420!important;
+  box-shadow:none!important;
+}
+
+.heatPrimaryFilters{
+  display:grid;
+  grid-template-columns:minmax(330px,1fr) minmax(300px,.85fr);
+  gap:9px;
+}
+.heatPrimaryFilters section,.matrixSettingsMenu section{display:grid;gap:5px;min-width:0}
+.heatPrimaryFilters label,.matrixSettingsMenu label{display:flex;justify-content:space-between;gap:8px;color:#8194ab;font-size:8px;font-weight:900;text-transform:uppercase}
+.heatPrimaryFilters label em{color:#b2c2d4;font-size:8px;font-style:normal;text-transform:none}
+
+.matrixSettingsMenu{
+  display:none;
+  grid-template-columns:repeat(4,minmax(170px,1fr));
+  gap:8px;
+  padding:9px;
+  border-top:1px solid rgba(148,177,218,.09);
+  background:#08121d;
+}
+.matrixSettingsMenu.open{display:grid;animation:matrixSettingsIn .14s ease-out}
+@keyframes matrixSettingsIn{from{opacity:.4;transform:translateY(-2px)}to{opacity:1;transform:none}}
+
+.heatSegment{
+  min-height:31px;
+  border-color:rgba(148,177,218,.1)!important;
+  border-radius:6px!important;
+  background:#07101a!important;
+}
+.heatSegment button{min-height:27px!important;border-radius:4px!important;color:#8fa2b8!important}
+.heatSegment button:hover{color:#eef8ff!important;background:rgba(255,255,255,.035)}
+.heatSegment button.active{color:#e9fcff!important;border-color:rgba(36,197,220,.34)!important;background:rgba(30,160,184,.12)!important;box-shadow:none!important}
+
+.heatExpiryBar{grid-template-columns:110px minmax(0,1fr)!important}
+.heatExpiryChoice{
+  flex-basis:88px!important;
+  min-height:39px!important;
+  border-color:rgba(148,177,218,.11)!important;
+  border-radius:6px!important;
+  background:#0b1520!important;
+  box-shadow:none!important;
+}
+.heatExpiryChoice.active{border-color:rgba(31,196,183,.5)!important;background:rgba(17,135,127,.13)!important}
+
+.heatPosition{
+  min-height:36px;
+  border:1px solid rgba(148,177,218,.09)!important;
+  border-radius:6px!important;
+  background:#08131e!important;
+  box-shadow:none!important;
+}
+
+.heatRead{gap:6px!important;margin-bottom:8px!important}
+.heatRead p{border-color:rgba(148,177,218,.08)!important;background:#09131e!important}
+
+.heatBoard{
+  min-width:0!important;
+  overflow:hidden!important;
+  border-color:rgba(148,177,218,.11)!important;
+  border-radius:7px!important;
+  background:#07111b!important;
+}
+
+.heatTableViewport{
+  position:relative;
+  width:100%;
+  height:clamp(430px,62dvh,680px);
+  overflow:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable both-edges;
+  scrollbar-color:#52677d #07111b;
+  scrollbar-width:thin;
+  cursor:grab;
+}
+.heatTableViewport.compact{height:520px}
+.heatTableViewport.is-dragging{cursor:grabbing;user-select:none}
+.heatTableViewport::-webkit-scrollbar{width:10px;height:11px}
+.heatTableViewport::-webkit-scrollbar-track{background:#07111b}
+.heatTableViewport::-webkit-scrollbar-thumb{border:2px solid #07111b;border-radius:8px;background:#52677d}
+
+.heatGridHeader,
+.heatVirtualRow{
+  min-width:var(--heat-grid-min);
+  display:grid;
+  grid-template-columns:110px repeat(var(--expiry-cols),var(--heat-cell-w)) minmax(270px,1fr);
+}
+.heatGridHeader{
+  position:sticky;
+  z-index:20;
+  top:0;
+  height:42px;
+  background:#111b29;
+  box-shadow:0 1px 0 rgba(148,177,218,.16);
+}
+.heatVirtualTrack{position:relative;contain:strict;will-change:transform}
+.heatVirtualRows{position:absolute;inset:0 auto auto 0;width:100%;will-change:transform}
+.heatVirtualRow{height:var(--heat-row-h);contain:layout paint}
+.heatVirtualRow.odd{background:rgba(255,255,255,.012)}
+.heatVirtualRow.even{background:#07111b}
+
+.heatVirtualCell{
+  min-width:0;
+  height:var(--heat-row-h);
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding:0 9px;
+  border-right:1px solid rgba(148,177,218,.065);
+  border-bottom:1px solid rgba(148,177,218,.065);
+  color:#dce8f4;
+  font-size:10px;
+  font-weight:850;
+  line-height:1;
+  letter-spacing:0;
+}
+.heatGridHeader .heatVirtualCell{height:42px;border-bottom:0;background:#111b29}
+.heatColumnHead{display:grid;place-content:center;gap:3px;text-align:center}
+.heatColumnHead b{font-size:10px}.heatColumnHead small{color:#768ba4;font-size:8px}
+.heatCorner,
+.heatStrike{position:sticky;left:0;z-index:12;justify-content:space-between;background:#091522!important;color:#73bcff!important}
+.heatCorner{z-index:30;justify-content:center;color:#dfeaf6!important}
+.heatStrike b{font-size:10px}.heatStrike small{max-width:58px;border-radius:3px;padding:3px 4px;background:rgba(93,166,226,.14);color:#9ed4ff;font-size:7px;line-height:1.05;text-align:center}
+.heatData{background:rgba(255,255,255,.012);cursor:help;transition:background-color .1s ease,filter .1s ease}
+.heatData.pos{background:rgba(var(--hm-pos-rgb),calc(var(--a) * .25));color:#dffcf6}
+.heatData.neg{background:rgba(var(--hm-neg-rgb),calc(var(--a) * .24));color:#ffe4ea}
+.heatData:hover,.heatData:focus-visible{z-index:10;filter:brightness(1.18);outline:1px solid rgba(209,231,255,.46);outline-offset:-1px}
+.heatData.hot{box-shadow:inset 0 0 0 1px rgba(246,210,64,.92)!important}
+.heatData.spotRow{box-shadow:inset 0 1px 0 #52cfff,inset 0 -1px 0 #52cfff!important}
+.heatData.missing{justify-content:center;color:#4f6176;background:transparent}
+
+.heatNetHead,
+.heatNetCell{position:sticky;right:0;z-index:11;background:#09131e!important}
+.heatNetHead{z-index:25;display:flex;justify-content:space-between;gap:8px;color:#dfe9f4}
+.heatNetHead em{color:#71869f;font-size:8px;font-style:normal;white-space:nowrap}
+.heatNetCell{display:grid;grid-template-columns:52px minmax(90px,1fr) 76px;gap:8px}
+.heatNetCell>b{color:#77baff}.heatNetCell>strong{text-align:right;white-space:nowrap}
+.netTrack{height:7px;border-radius:4px;background:rgba(255,255,255,.04);overflow:hidden}.netTrack i{display:block;height:100%;border-radius:inherit}
+.netTrack i.pos{background:#22bea3}.netTrack i.neg{background:#d84973}
+
+.heatTableViewport.is-scrolling .heatData{transition:none;box-shadow:none!important}
+.heatTableViewport.is-scrolling .heatVirtualRow{pointer-events:none}
+
+.heatSkeleton{
+  min-height:440px;
+  display:grid;
+  align-content:center;
+  gap:9px;
+  padding:16px;
+  border:1px solid rgba(148,177,218,.1);
+  border-radius:7px;
+  background:#08121d;
+}
+.heatSkeleton>div{display:flex;align-items:center;justify-content:center;gap:8px;color:#9fb2c8;font-size:11px}
+.heatSkeleton svg{animation:statusSpin .8s linear infinite}
+.heatSkeleton>i{height:34px;border-radius:4px;background:linear-gradient(90deg,#0c1723,#122131,#0c1723);background-size:240% 100%;animation:heatShimmer 1.1s linear infinite}
+@keyframes heatShimmer{to{background-position:-240% 0}}
+@keyframes statusSpin{to{transform:rotate(360deg)}}
+
+.heatCards article{border-color:rgba(148,177,218,.08)!important;border-radius:6px!important;background:#0a141f!important;box-shadow:none!important}
+.heatLegend{color:#71869f!important}
+
+.triProSummary{
+  border:0!important;
+  border-radius:7px!important;
+  background:#0c1825!important;
+  box-shadow:none!important;
+}
+.triProSummary [data-tri-sync]{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.tri.triPro{border-color:rgba(148,177,218,.1)!important;background:#08121d!important;box-shadow:none!important}
+.triProHead{background:#0b1622}
+.triLevel{content-visibility:auto;contain-intrinsic-size:38px;contain:layout paint}
+.triIcon{color:#98abc1!important;background:#0c1723!important}
+.triIcon:hover{border-color:rgba(37,193,214,.35)!important;color:#e4fbff!important;background:rgba(25,160,180,.09)!important}
+.triPending{min-height:180px;display:grid;place-items:center;align-content:center;gap:8px;color:#9eb1c7}.triPending svg{animation:statusSpin .8s linear infinite}
+.triProList{scroll-behavior:smooth;will-change:scroll-position}
+
+.modalBody .heatTableViewport{height:calc(100dvh - 235px);min-height:520px}
+.modalBody .trinityPro{height:100%!important}
+
+@media(max-width:1180px){
+  .heatTerminal{grid-template-columns:minmax(160px,.5fr) minmax(360px,1.2fr)!important}
+  .heatTerminalActions{grid-column:1/-1;justify-content:flex-start}
+  .heatPrimaryFilters{grid-template-columns:1fr}
+  .matrixSettingsMenu{grid-template-columns:repeat(2,minmax(180px,1fr))}
+  .heatTableViewport{height:600px}
+}
+
+@media(max-width:720px){
+  .systemStatusMenu{position:fixed;top:76px;left:8px;right:8px;width:auto}
+  .heatTerminal{grid-template-columns:1fr!important}
+  .heatTabs{order:3}
+  .heatTerminalActions{grid-column:auto;justify-content:space-between}
+  .matrixSettingsButton span{display:none}
+  .matrixSettingsMenu{grid-template-columns:1fr}
+  .heatPrimaryFilters{display:grid;grid-template-columns:1fr}
+  .heatExpiryBar{grid-template-columns:1fr!important}
+  .heatTableViewport,.heatTableViewport.compact{height:560px}
+  .heatGridHeader,.heatVirtualRow{grid-template-columns:100px repeat(var(--expiry-cols),minmax(150px,var(--heat-cell-w))) 250px}
+  .heatNetHead,.heatNetCell{position:static}
+  .heatVirtualCell{padding:0 7px}
+  .heatCards{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  #trinity #triFull.trinityPro{gap:8px!important}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .chip,.btn,.expand,.heatSegment button,.heatExpiryChoice,.triIcon,.matrixSettingsButton,.systemStatusButton,.view{transition:none!important;animation:none!important}
 }
 
 .heatCards article {

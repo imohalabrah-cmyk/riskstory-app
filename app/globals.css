@@ -115,6 +115,9 @@ button { -webkit-tap-highlight-color: transparent; }
   .chartSettingsGrid section { min-height: auto; }
 }
 
+/* Portal-based chart popovers must sit above the chart panel's clipping boundary. */
+.chartFloatingPopover { position: fixed; z-index: 1001; }
+
 @media (max-width: 480px) {
   .chartTimeframes .toolButton:nth-child(-n + 2) { display: none; }
   .chartToolbarGroup { padding-right: 3px; }

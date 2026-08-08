@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ReactNode, RefObject } from "react";
 import {
@@ -50,13 +50,15 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
   const [showGrid, setShowGrid] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(true);
   const [showDrawingTools, setShowDrawingTools] = useState(true);
-  const [activePopover, setActivePopover] = useState<"data" | null>(null);
+  const [dataOpen, setDataOpen] = useState(false);
+  const [dataPosition, setDataPosition] = useState<{ left: number; top: number; transform?: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [fitNonce, setFitNonce] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedCandle, setSelectedCandle] = useState<Candle | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
+  const dataButtonRef = useRef<HTMLButtonElement>(null);
+  const dataPopoverRef = useRef<HTMLDivElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsCloseButtonRef = useRef<HTMLButtonElement>(null);
   const wasSettingsOpenRef = useRef(false);
@@ -73,7 +75,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
     const updateFullscreen = () => setIsFullscreen(document.fullscreenElement === stageRef.current);
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setActivePopover(null);
+      setDataOpen(false);
       setSettingsOpen(false);
     };
     document.addEventListener("fullscreenchange", updateFullscreen);
@@ -86,11 +88,36 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
 
   useEffect(() => {
     const closeOnOutsidePointer = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) setActivePopover(null);
+      const target = event.target as Node;
+      if (dataButtonRef.current?.contains(target) || dataPopoverRef.current?.contains(target)) return;
+      setDataOpen(false);
     };
-    if (activePopover) document.addEventListener("mousedown", closeOnOutsidePointer);
+    if (dataOpen) document.addEventListener("mousedown", closeOnOutsidePointer);
     return () => document.removeEventListener("mousedown", closeOnOutsidePointer);
-  }, [activePopover]);
+  }, [dataOpen]);
+
+  useLayoutEffect(() => {
+    if (!dataOpen) return;
+    const updatePosition = () => {
+      const rect = dataButtonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = 250;
+      const height = 210;
+      const openAbove = rect.bottom + 8 + height > window.innerHeight && rect.top > height;
+      setDataPosition({
+        left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)),
+        top: openAbove ? rect.top - 8 : rect.bottom + 8,
+        transform: openAbove ? "translateY(-100%)" : undefined,
+      });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [dataOpen]);
 
   useEffect(() => {
     if (settingsOpen) settingsCloseButtonRef.current?.focus();
@@ -108,7 +135,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
   return <>
   <Panel title={title} onExpand={onExpand} className="chartPanel">
     <div className="chartTerminal" ref={stageRef}>
-      <div className="chartToolbar" aria-label="Chart controls" ref={popoverRef}>
+      <div className="chartToolbar" aria-label="Chart controls">
         <div className="chartToolbarGroup chartIdentity"><CandlestickChart size={15} aria-hidden="true" /><strong>{availableMarket?.symbol ?? "--"}</strong><span>{frame}</span></div>
         <div className="chartToolbarGroup chartTimeframes" aria-label="Timeframe">
           {frames.map((item) => <button type="button" className={classNames("toolButton", frame === item && "active")} key={item} onClick={() => onFrame(item)}>{item}</button>)}
@@ -116,8 +143,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
         <label className="chartSelectLabel rangeControl">Range<select className="chartSelect" value={range} onChange={(event) => onRange(event.target.value)} aria-label="Expiration range"><option>0DTE</option><option>Daily</option><option>Weekly</option><option>Custom</option></select></label>
         <label className="chartSelectLabel gexControl">GEX<select className="chartSelect" value={gexMode} onChange={(event) => setGexMode(event.target.value as GexMode)} disabled={!hasGex} aria-label="GEX overlay"><option value="off">Off</option><option value="bubbles">Bubbles</option><option value="levels">Levels</option><option value="both">Both</option></select></label>
         <div className="chartSettings">
-          <button type="button" className={classNames("toolButton", "dataStatusControl", activePopover === "data" && "active")} onClick={() => setActivePopover((current) => current === "data" ? null : "data")} aria-expanded={activePopover === "data"} aria-label="Data overlay status"><Layers3 size={14} /><span>Data</span></button>
-          {activePopover === "data" && <div className="chartPopover dataPopover" role="dialog" aria-label="Data overlay status"><strong>Data overlays</strong><DataStatus label="Dark Pool" reason="No dark-pool levels are supplied by the connected provider." /><DataStatus label="Flow" reason="Flow rows do not include chart-safe event timestamps." /><DataStatus label="Whales" reason="Whale classifications are not supplied by the connected provider." /></div>}
+          <button ref={dataButtonRef} type="button" className={classNames("toolButton", "dataStatusControl", dataOpen && "active")} onClick={() => setDataOpen((current) => !current)} aria-expanded={dataOpen} aria-label="Data overlay status"><Layers3 size={14} /><span>Data</span></button>
         </div>
         <div className="chartToolbarSpacer" />
         <div className="chartToolbarGroup chartActions">
@@ -125,7 +151,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
           <button type="button" className="iconTool" onClick={() => setDrawings((current) => current.slice(0, -1))} disabled={!canUndo} aria-label="Undo last drawing" title="Undo"><Undo2 size={15} /></button>
           <button type="button" className="iconTool" onClick={() => setDrawings([])} disabled={!canUndo} aria-label="Clear drawings" title="Clear drawings"><Trash2 size={15} /></button>
           <button type="button" className="iconTool" onClick={() => setFitNonce((value) => value + 1)} aria-label="Fit chart content" title="Fit chart"><RotateCcw size={15} /></button>
-          <button ref={settingsButtonRef} type="button" className={classNames("iconTool", settingsOpen && "active")} onClick={() => { setActivePopover(null); setSettingsOpen(true); }} aria-label="Chart settings" aria-expanded={settingsOpen} title="Chart settings"><Settings2 size={15} /></button>
+          <button ref={settingsButtonRef} type="button" className={classNames("iconTool", settingsOpen && "active")} onClick={() => { setDataOpen(false); setSettingsOpen(true); }} aria-label="Chart settings" aria-expanded={settingsOpen} title="Chart settings"><Settings2 size={15} /></button>
           <button type="button" className="iconTool" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "Exit fullscreen chart" : "Enter fullscreen chart"} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>{isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
         </div>
       </div>
@@ -139,6 +165,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
       </div>
     </div>
   </Panel>
+  {dataOpen && dataPosition && createPortal(<div ref={dataPopoverRef} className="chartPopover dataPopover chartFloatingPopover" style={dataPosition} role="dialog" aria-label="Data overlay status"><strong>Data overlays</strong><DataStatus label="Dark Pool" reason="No dark-pool levels are supplied by the connected provider." /><DataStatus label="Flow" reason="Flow rows do not include chart-safe event timestamps." /><DataStatus label="Whales" reason="Whale classifications are not supplied by the connected provider." /></div>, document.body)}
   {settingsOpen && createPortal(<ChartSettingsModal closeButtonRef={settingsCloseButtonRef} onClose={() => setSettingsOpen(false)} showLevels={showLevels} setShowLevels={setShowLevels} showVolume={showVolume} setShowVolume={setShowVolume} showGrid={showGrid} setShowGrid={setShowGrid} showCrosshair={showCrosshair} setShowCrosshair={setShowCrosshair} showDrawingTools={showDrawingTools} setShowDrawingTools={setShowDrawingTools} />, document.body)}
   </>;
 }

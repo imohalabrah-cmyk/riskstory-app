@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test:gex-intelligence": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/gex-intelligence.test.js",
     "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-opennext-worker.mjs",
     "preview": "npm run build:cloudflare && opennextjs-cloudflare preview",
     "deploy": "npm run build:cloudflare && opennextjs-cloudflare deploy",

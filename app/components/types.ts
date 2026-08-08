@@ -8,6 +8,7 @@ import type { OpenInterestDashboard } from "../lib/open-interest/types";
 export type ViewId =
   | "command"
   | "gamma"
+  | "gex"
   | "heatmap"
   | "trinity"
   | "flow"

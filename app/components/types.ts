@@ -17,6 +17,7 @@ export type ViewId =
 
 export type AppData = {
   market: MarketRead | null;
+  trinity: Record<"SPX" | "SPY" | "QQQ", MarketRead | null>;
   candles: CandleRead | null;
   flow: FlowRead | null;
   openInterest: OpenInterestDashboard | null;

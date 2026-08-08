@@ -18,12 +18,11 @@ type Props = { view: ViewId; symbol: string; onSymbol: (symbol: string) => void;
 
 export function Header({ view, symbol, onSymbol, onRefresh, loading }: Props) {
   const [title, subtitle] = titles[view];
+  const commitSymbol = (value: string) => onSymbol(value.toUpperCase().replace(/[^A-Z0-9.]/g, "") || "SPY");
   return <header className="top">
     <div className="title"><div className="logo">ϟ</div><div><h1>{title}</h1><p>{subtitle}</p></div></div>
     <div className="actions">
-      <select className="control" aria-label="Asset type" defaultValue="all"><option value="all">All Assets</option><option value="index">Indexes</option><option value="etf">ETFs</option><option value="stock">Stocks</option></select>
-      <input className="control search" value={symbol} onChange={(event) => onSymbol(event.target.value.toUpperCase().replace(/[^A-Z0-9.]/g, ""))} onBlur={(event) => onSymbol(event.target.value || "SPY")} aria-label="Ticker symbol" placeholder="SPY" />
-      <button className="btn" type="button">AR / EN</button>
+      <input key={symbol} className="control search" defaultValue={symbol} onKeyDown={(event) => { if (event.key === "Enter") commitSymbol(event.currentTarget.value); }} onBlur={(event) => commitSymbol(event.currentTarget.value)} aria-label="Ticker symbol" placeholder="SPY" />
       <button className="btn good" type="button" onClick={onRefresh} disabled={loading}><RefreshCw size={15} className={loading ? "spin" : undefined} /> Sync Feed</button>
     </div>
   </header>;

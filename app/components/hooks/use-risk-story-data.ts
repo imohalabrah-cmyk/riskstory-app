@@ -12,7 +12,7 @@ async function request<T>(path: string) {
 }
 
 export function useRiskStoryData(symbol: string, range: string, frame: string) {
-  const [data, setData] = useState<AppData>({ market: null, candles: null, flow: null, openInterest: null });
+  const [data, setData] = useState<AppData>({ market: null, trinity: { SPX: null, SPY: null, QQQ: null }, candles: null, flow: null, openInterest: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,9 +26,16 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
       request<CandleRead>(`/api/candles?${candleQuery}`),
       request<FlowRead>(`/api/flow?${query}`),
       request<OpenInterestDashboard>("/api/open-interest"),
+      ...(["SPX", "SPY", "QQQ"] as const).map((trinitySymbol) => request<MarketRead>(`/api/market?${new URLSearchParams({ symbol: trinitySymbol, range })}`)),
     ]);
     const value = <T,>(index: number) => results[index].status === "fulfilled" ? results[index].value as T : null;
-    setData({ market: value<MarketRead>(0), candles: value<CandleRead>(1), flow: value<FlowRead>(2), openInterest: value<OpenInterestDashboard>(3) });
+    setData({
+      market: value<MarketRead>(0),
+      candles: value<CandleRead>(1),
+      flow: value<FlowRead>(2),
+      openInterest: value<OpenInterestDashboard>(3),
+      trinity: { SPX: value<MarketRead>(4), SPY: value<MarketRead>(5), QQQ: value<MarketRead>(6) },
+    });
     const failed = results.filter((result) => result.status === "rejected");
     setError(failed.length ? "Some provider reads are unavailable." : null);
     setLoading(false);

@@ -2,12 +2,17 @@ import type { MarketRead } from "../lib/market/types";
 import { Panel } from "./panel";
 import { price } from "./utils";
 
-type Props = { market: MarketRead | null; onExpand?: () => void };
+type Props = { reads: Record<"SPX" | "SPY" | "QQQ", MarketRead | null>; onExpand?: () => void };
 
-export function TrinityPanel({ market, onExpand }: Props) {
+export function TrinityPanel({ reads, onExpand }: Props) {
   const symbols = ["SPX", "SPY", "QQQ"];
+  const usable = (symbol: string) => {
+    const read = reads[symbol as keyof typeof reads];
+    return read?.provenance.mode === "unavailable" ? null : read;
+  };
+  const available = symbols.filter((symbol) => usable(symbol)).length;
   return <Panel title="Trinity View | SPX + SPY + QQQ" onExpand={onExpand} className="trinityPanel">
-    <div className="trinitySummary"><span>TRINITY MATRIX</span><strong>{market ? "Provider-backed" : "Waiting for data"}</strong><small>Linked index, ETF, and technology positioning.</small></div>
-    <div className="trinityGrid">{symbols.map((symbol, index) => { const delta = index - 1; const spot = market ? market.snapshot.spot + delta * (symbol === "SPX" ? 6700 : 25) : 0; const node = market ? market.snapshot.zeroGamma + delta * 5 : 0; return <article className="trinityCard" key={symbol}><header><b>{symbol}</b><span>Linked</span></header><strong>{market ? price(spot) : "--"}</strong><p>Control node {market ? price(node) : "--"}</p><div className="miniBars">{Array.from({ length: 9 }, (_, bar) => <i key={bar} style={{ width: `${30 + ((bar * 17 + index * 11) % 68)}%` }} />)}</div></article>; })}</div>
+    <div className="trinitySummary"><span>TRINITY MATRIX</span><strong>{available === 3 ? "Provider-backed" : "Partial / unavailable"}</strong><small>{available}/3 independent provider reads available.</small></div>
+    <div className="trinityGrid">{symbols.map((symbol) => { const read = usable(symbol); return <article className="trinityCard" key={symbol}><header><b>{symbol}</b><span>{read?.provenance.mode ?? "unavailable"}</span></header><strong>{read ? price(read.snapshot.spot) : "--"}</strong><p>Control node {read ? price(read.snapshot.zeroGamma) : "--"}</p>{read ? <div className="miniBars"><i style={{ width: `${Math.max(12, Math.min(100, read.quality.completeness))}%` }} /></div> : <small className="unavailable">Provider read unavailable</small>}</article>; })}</div>
   </Panel>;
 }

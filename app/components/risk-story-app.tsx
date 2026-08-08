@@ -25,12 +25,12 @@ export function RiskStoryApp() {
     <Sidebar active={view} onChange={setView} />
     <main className="main"><Header view={view} symbol={symbol} onSymbol={setSymbol} onRefresh={() => void refresh()} loading={loading} />
       <section className="workspace" aria-busy={loading}>{error && <p className="dataNotice">{error}</p>}
-        {view === "command" && <div className="commandView"><Dashboard market={data.market} loading={loading} /><div className="commandPrimary"><ChartPanel market={data.market} candles={data.candles} frame={frame} onFrame={setFrame} onExpand={() => expand("chart")} /><FlowPanel flow={data.flow} compact /></div><div className="commandSecondary"><TrinityPanel market={data.market} onExpand={() => expand("trinity")} /><HeatmapPanel market={data.market} onExpand={() => expand("heatmap")} /></div></div>}
-        {view === "gamma" && <div className="gammaView"><Dashboard market={data.market} loading={loading} /><ChartPanel title="Gamma Chart" market={data.market} candles={data.candles} frame={frame} onFrame={setFrame} /><GammaPanel market={data.market} /></div>}
+        {view === "command" && <div className="commandView"><Dashboard market={data.market} loading={loading} /><div className="commandPrimary"><ChartPanel market={data.market} candles={data.candles} range={range} onRange={setRange} frame={frame} onFrame={setFrame} onExpand={() => expand("chart")} /><FlowPanel flow={data.flow} compact /></div><div className="commandSecondary"><TrinityPanel reads={data.trinity} onExpand={() => expand("trinity")} /><HeatmapPanel market={data.market} onExpand={() => expand("heatmap")} /></div></div>}
+        {view === "gamma" && <div className="gammaView"><Dashboard market={data.market} loading={loading} /><ChartPanel title="Gamma Chart" market={data.market} candles={data.candles} range={range} onRange={setRange} frame={frame} onFrame={setFrame} /><GammaPanel market={data.market} /></div>}
         {view === "heatmap" && <HeatmapPanel market={data.market} title="Heatmap Matrix" />}
-        {view === "trinity" && <TrinityPanel market={data.market} />}
+        {view === "trinity" && <TrinityPanel reads={data.trinity} />}
         {view === "flow" && <FlowPanel flow={data.flow} />}
-        {view === "chart" && <ChartPanel title="Chart Lab" market={data.market} candles={data.candles} frame={frame} onFrame={setFrame} />}
+        {view === "chart" && <ChartPanel title="Chart Lab" market={data.market} candles={data.candles} range={range} onRange={setRange} frame={frame} onFrame={setFrame} />}
         {view === "openInterest" && <OpenInterestPanel data={data.openInterest} />}
         {view === "alerts" && <AlertsPanel />}
       </section>

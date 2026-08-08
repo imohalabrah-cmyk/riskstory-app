@@ -1,12 +1,13 @@
 "use client";
 
-import { Activity, Bell, Boxes, ChartCandlestick, Gauge, LayoutDashboard, TableProperties, TrendingUp } from "lucide-react";
+import { Activity, Bell, Boxes, ChartCandlestick, Gauge, LayoutDashboard, Network, TableProperties, TrendingUp } from "lucide-react";
 import type { ViewId } from "./types";
 import { classNames } from "./utils";
 
 const items: Array<{ id: ViewId; label: string; icon: typeof LayoutDashboard }> = [
   { id: "command", label: "Command Center", icon: LayoutDashboard },
   { id: "gamma", label: "Gamma Center", icon: Gauge },
+  { id: "gex", label: "GEX Intelligence", icon: Network },
   { id: "heatmap", label: "Heatmap Matrix", icon: TableProperties },
   { id: "trinity", label: "Trinity View", icon: Boxes },
   { id: "flow", label: "Options Flow", icon: Activity },

@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "./premium.css";
 
 export const metadata: Metadata = {
   title: "Risk Story",
-  description: "Gamma intelligence and options flow command center",
+  description: "Options analytics workspace for gamma, flow, heatmap, and open interest.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

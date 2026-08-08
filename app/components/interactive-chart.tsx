@@ -140,11 +140,20 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
     if (!series || !volume) return;
     const previous = previousCandlesRef.current;
     const nextLast = nextCandles.at(-1);
-    const canUpdate = Boolean(nextLast) && (equivalentTimeline(previous, nextCandles) || (nextCandles.length === previous.length + 1 && previous.every((candle, index) => candle.time === nextCandles[index]?.time)));
+    const sameTimeline = Boolean(nextLast) && equivalentTimeline(previous, nextCandles);
+    const appendedOne = Boolean(nextLast) && nextCandles.length === previous.length + 1 && previous.every((candle, index) => candle.time === nextCandles[index]?.time);
     const prependedCount = nextCandles.length - previous.length;
     const prepended = prependedCount > 0 && previous.every((candle, index) => candle.time === nextCandles[prependedCount + index]?.time);
     const visibleRange = prepended ? chartRef.current?.timeScale().getVisibleLogicalRange() ?? null : null;
-    if (canUpdate && nextLast) {
+    if (sameTimeline && nextLast) {
+      series.update({ ...nextLast, time: nextLast.time as Time });
+      volume.update(volumeBars([nextLast])[0]);
+    } else if (appendedOne && nextLast) {
+      const revisedPrevious = nextCandles.at(-2);
+      if (revisedPrevious) {
+        series.update({ ...revisedPrevious, time: revisedPrevious.time as Time });
+        volume.update(volumeBars([revisedPrevious])[0]);
+      }
       series.update({ ...nextLast, time: nextLast.time as Time });
       volume.update(volumeBars([nextLast])[0]);
     } else {

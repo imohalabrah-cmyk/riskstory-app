@@ -9,9 +9,10 @@ export async function GET(request: Request) {
   const frame = url.searchParams.get("frame") || "10m";
   const beforeValue = Number(url.searchParams.get("before"));
   const before = Number.isFinite(beforeValue) && beforeValue > 0 ? beforeValue : undefined;
+  const latest = url.searchParams.get("latest") === "1";
   const provider = getMarketProvider();
 
-  return NextResponse.json(await provider.getCandles({ symbol, frame, before }), {
+  return NextResponse.json(await provider.getCandles({ symbol, frame, before, latest }), {
     headers: { "Cache-Control": "no-store" },
   });
 }

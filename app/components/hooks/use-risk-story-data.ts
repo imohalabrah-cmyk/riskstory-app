@@ -5,10 +5,48 @@ import type { CandleRead, FlowRead, MarketRead } from "../../lib/market/types";
 import type { OpenInterestDashboard } from "../../lib/open-interest/types";
 import type { AppData } from "../types";
 
+const CANDLE_POLL_INTERVAL_MS = 15 * 60 * 1000;
+const POLLABLE_CANDLE_AGE_MS = 30 * 60 * 1000;
+
 async function request<T>(path: string) {
   const response = await fetch(path, { cache: "no-store" });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<T>;
+}
+
+function sameCandleContext(current: CandleRead | null, symbol: string, frame: string) {
+  return current?.symbol === symbol && current.frame === frame;
+}
+
+function isAvailable(read: CandleRead | null): read is CandleRead {
+  return Boolean(read && read.provenance.mode !== "unavailable" && read.candles.length);
+}
+
+function mergeLatestCandles(current: CandleRead, latest: CandleRead): CandleRead {
+  const candlesByTime = new Map(current.candles.map((candle) => [candle.time, candle]));
+  latest.candles.forEach((candle) => candlesByTime.set(candle.time, candle));
+  return {
+    ...latest,
+    candles: [...candlesByTime.values()].sort((a, b) => a.time - b.time),
+    pagination: current.pagination,
+  };
+}
+
+function reconnectingRead(current: CandleRead): CandleRead {
+  return {
+    ...current,
+    connection: {
+      state: current.connection?.state === "stale" ? "stale" : "reconnecting",
+      lastSuccessfulAt: current.connection?.lastSuccessfulAt ?? current.updatedAt,
+      pollIntervalSeconds: CANDLE_POLL_INTERVAL_MS / 1000,
+    },
+  };
+}
+
+function canPoll(read: CandleRead | null) {
+  if (!isAvailable(read) || read.connection?.state === "unavailable") return false;
+  const asOf = read.provenance.asOf ? new Date(read.provenance.asOf).getTime() : Number.NaN;
+  return Number.isFinite(asOf) && Date.now() - asOf <= POLLABLE_CANDLE_AGE_MS;
 }
 
 export function useRiskStoryData(symbol: string, range: string, frame: string) {
@@ -17,6 +55,7 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
   const [error, setError] = useState<string | null>(null);
   const dataRef = useRef(data);
   const loadingOlderRef = useRef(false);
+  const pollingRef = useRef(false);
 
   useEffect(() => {
     dataRef.current = data;
@@ -35,13 +74,18 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
       ...(["SPX", "SPY", "QQQ"] as const).map((trinitySymbol) => request<MarketRead>(`/api/market?${new URLSearchParams({ symbol: trinitySymbol, range })}`)),
     ]);
     const value = <T,>(index: number) => results[index].status === "fulfilled" ? results[index].value as T : null;
-    setData({
+    const incomingCandles = value<CandleRead>(1);
+
+    setData((current) => ({
       market: value<MarketRead>(0),
-      candles: value<CandleRead>(1),
+      candles: !isAvailable(incomingCandles) && sameCandleContext(current.candles, symbol, frame)
+        ? reconnectingRead(current.candles!)
+        : incomingCandles,
       flow: value<FlowRead>(2),
       openInterest: value<OpenInterestDashboard>(3),
       trinity: { SPX: value<MarketRead>(4), SPY: value<MarketRead>(5), QQQ: value<MarketRead>(6) },
-    });
+    }));
+
     const failed = results.filter((result) => result.status === "rejected");
     setError(failed.length ? "Some provider reads are unavailable." : null);
     setLoading(false);
@@ -52,6 +96,47 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
     return () => window.clearTimeout(timeout);
   }, [refresh]);
 
+  const refreshLatestCandles = useCallback(async () => {
+    if (pollingRef.current) return;
+    const current = dataRef.current.candles;
+    if (!sameCandleContext(current, symbol, frame) || !canPoll(current)) return;
+
+    pollingRef.current = true;
+    try {
+      const query = new URLSearchParams({ symbol, frame, latest: "1" });
+      const latest = await request<CandleRead>(`/api/candles?${query}`);
+      setData((existing) => {
+        const active = existing.candles;
+        if (!sameCandleContext(active, symbol, frame)) return existing;
+        return isAvailable(latest)
+          ? { ...existing, candles: mergeLatestCandles(active!, latest) }
+          : { ...existing, candles: reconnectingRead(active!) };
+      });
+    } catch {
+      setData((existing) => sameCandleContext(existing.candles, symbol, frame) && existing.candles
+        ? { ...existing, candles: reconnectingRead(existing.candles) }
+        : existing);
+    } finally {
+      pollingRef.current = false;
+    }
+  }, [frame, symbol]);
+
+  const pollingEligible = canPoll(data.candles);
+  useEffect(() => {
+    if (!pollingEligible) return;
+    const refreshOnVisibility = () => {
+      if (document.visibilityState === "visible") void refreshLatestCandles();
+    };
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshLatestCandles();
+    }, CANDLE_POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", refreshOnVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshOnVisibility);
+    };
+  }, [pollingEligible, refreshLatestCandles]);
+
   const loadOlderCandles = useCallback(async (before: number) => {
     const current = dataRef.current.candles;
     if (loadingOlderRef.current || !current?.candles.length || current.pagination?.hasMore === false) return;
@@ -61,29 +146,29 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
       const query = new URLSearchParams({ symbol, frame, before: String(before) });
       const older = await request<CandleRead>(`/api/candles?${query}`);
       if (older.provenance.mode === "unavailable" || !older.candles.length) {
-        setData((existing) => existing.candles && existing.candles.symbol === symbol && existing.candles.frame === frame ? {
+        setData((existing) => sameCandleContext(existing.candles, symbol, frame) ? {
           ...existing,
-          candles: { ...existing.candles, pagination: { hasMore: false, oldestTime: existing.candles.candles[0]?.time ?? null } },
+          candles: { ...existing.candles!, pagination: { hasMore: false, oldestTime: existing.candles!.candles[0]?.time ?? null } },
         } : existing);
         return;
       }
 
       setData((existing) => {
         const active = existing.candles;
-        if (!active || active.symbol !== symbol || active.frame !== frame) return existing;
-        const knownTimes = new Set(active.candles.map((candle) => candle.time));
+        if (!sameCandleContext(active, symbol, frame)) return existing;
+        const knownTimes = new Set(active!.candles.map((candle) => candle.time));
         const historical = older.candles.filter((candle) => !knownTimes.has(candle.time));
         if (!historical.length) {
           return {
             ...existing,
-            candles: { ...active, pagination: { hasMore: false, oldestTime: active.candles[0]?.time ?? null } },
+            candles: { ...active!, pagination: { hasMore: false, oldestTime: active!.candles[0]?.time ?? null } },
           };
         }
-        const candles = [...historical, ...active.candles];
+        const candles = [...historical, ...active!.candles].sort((left, right) => left.time - right.time);
         return {
           ...existing,
           candles: {
-            ...active,
+            ...active!,
             candles,
             pagination: {
               hasMore: older.pagination?.hasMore ?? true,

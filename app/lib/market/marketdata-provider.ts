@@ -121,7 +121,8 @@ function stringArray(data: MarketDataJson, key: string): string[] {
 
 function candleResolution(frame: string) {
   const normalized = frame.toLowerCase();
-  if (normalized.includes("1h") || normalized.includes("60")) return "60";
+  if (normalized === "1m" || normalized.includes("1min")) return "1";
+  if (normalized.includes("1h") || normalized.includes("60")) return "1H";
   if (normalized.includes("1d") || normalized.includes("daily")) return "D";
   if (normalized.includes("5m")) return "5";
   if (normalized.includes("15m")) return "15";
@@ -130,40 +131,37 @@ function candleResolution(frame: string) {
 
 const CANDLE_BATCH_SIZE = 320;
 
-function candleBatchLookbackDays(frame: string) {
-  const normalized = frame.toLowerCase();
-  if (normalized.includes("1d") || normalized.includes("daily")) return 380;
-  if (normalized.includes("1h") || normalized.includes("60")) return 70;
-  if (normalized.includes("5m")) return 5;
-  if (normalized.includes("15m")) return 12;
-  return 8;
-}
-
-function isoDateDaysBefore(reference: Date, days: number) {
-  const date = new Date(reference);
-  date.setUTCDate(date.getUTCDate() - days);
-  return date.toISOString().slice(0, 10);
-}
-
 function parseCandles(data: MarketDataJson): Candle[] {
-  const times = numberArray(data, "t");
-  const opens = numberArray(data, "o");
-  const highs = numberArray(data, "h");
-  const lows = numberArray(data, "l");
-  const closes = numberArray(data, "c");
-  const volumes = numberArray(data, "v");
+  const rawNumbers = (key: string) => Array.isArray(data[key]) ? data[key].map((value) => Number(value)) : [];
+  const times = rawNumbers("t");
+  const opens = rawNumbers("o");
+  const highs = rawNumbers("h");
+  const lows = rawNumbers("l");
+  const closes = rawNumbers("c");
+  const volumes = rawNumbers("v");
   const rows = Math.min(times.length, opens.length, highs.length, lows.length, closes.length);
 
-  return Array.from({ length: rows }, (_, index) => ({
-    time: times[index],
-    open: opens[index],
-    high: highs[index],
-    low: lows[index],
-    close: closes[index],
-    volume: volumes[index] || 0,
-  }))
-    .filter((row) => Number.isFinite(row.time) && Number.isFinite(row.open) && Number.isFinite(row.high) && Number.isFinite(row.low) && Number.isFinite(row.close))
-    .sort((a, b) => a.time - b.time);
+  const now = Math.floor(Date.now() / 1000) + 60;
+  const unique = new Map<number, Candle>();
+
+  for (let index = 0; index < rows; index += 1) {
+    const row = {
+      time: times[index],
+      open: opens[index],
+      high: highs[index],
+      low: lows[index],
+      close: closes[index],
+      volume: volumes[index] ?? 0,
+    };
+    const validPrices = Number.isFinite(row.open) && Number.isFinite(row.high) && Number.isFinite(row.low) && Number.isFinite(row.close)
+      && row.open > 0 && row.high > 0 && row.low > 0 && row.close > 0
+      && row.high >= Math.max(row.open, row.close, row.low)
+      && row.low <= Math.min(row.open, row.close, row.high);
+    if (!Number.isFinite(row.time) || row.time <= 0 || row.time > now || !validPrices || !Number.isFinite(row.volume) || row.volume < 0) continue;
+    unique.set(row.time, row);
+  }
+
+  return [...unique.values()].sort((a, b) => a.time - b.time);
 }
 
 function firstNumber(data: MarketDataJson, keys: string[], fallback: number) {
@@ -715,15 +713,14 @@ export const marketDataProvider: MarketDataProvider = {
     return unavailableFlowRead("MarketData does not provide sweep, split, block, or dark-pool flow through this adapter.");
   },
 
-  async getCandles({ symbol, frame, before }) {
+  async getCandles({ symbol, frame, before, latest }) {
     try {
       const resolution = candleResolution(frame);
-      const end = Number.isFinite(before) && before && before > 0 ? new Date(before * 1000) : new Date();
-      const to = end.toISOString().slice(0, 10);
-      const from = isoDateDaysBefore(end, candleBatchLookbackDays(frame));
-      const data = await requestJson(`/stocks/candles/${resolution}/${encodeURIComponent(symbol)}/?from=${from}&to=${to}`);
-      const parsed = parseCandles(data).filter((candle) => !before || candle.time < before);
-      const candles = parsed.slice(-CANDLE_BATCH_SIZE);
+      const to = Number.isFinite(before) && before && before > 0 ? Math.floor(before) - 1 : Math.floor(Date.now() / 1000);
+      const countback = latest ? 2 : CANDLE_BATCH_SIZE;
+      const parameters = new URLSearchParams({ countback: String(countback), to: String(to), extended: "false" });
+      const data = await requestJson(`/stocks/candles/${resolution}/${encodeURIComponent(symbol)}/?${parameters}`);
+      const candles = parseCandles(data).filter((candle) => !before || candle.time < before);
 
       if (!candles.length) {
         if (before) {
@@ -746,6 +743,7 @@ export const marketDataProvider: MarketDataProvider = {
             },
             quality: { completeness: 100, warnings: [] },
             candles: [],
+            connection: { state: "stale", lastSuccessfulAt: null, pollIntervalSeconds: null },
             pagination: { hasMore: false, oldestTime: null },
           };
         }
@@ -774,9 +772,14 @@ export const marketDataProvider: MarketDataProvider = {
         },
         quality: {
           completeness: 100,
-          warnings: ["Realtime entitlement has not been verified; candles are labeled delayed."],
+          warnings: ["MarketData candles are provider-delayed; this endpoint does not provide real-time candles."],
         },
         candles,
+        connection: {
+          state: "delayed",
+          lastSuccessfulAt: updatedAt,
+          pollIntervalSeconds: 900,
+        },
         pagination: {
           hasMore: true,
           oldestTime: candles[0]?.time ?? null,

@@ -121,6 +121,11 @@ export type CandleRead = {
   provenance: DataProvenance;
   quality: DataQuality;
   candles: Candle[];
+  connection?: {
+    state: "delayed" | "stale" | "reconnecting" | "unavailable";
+    lastSuccessfulAt: string | null;
+    pollIntervalSeconds: number | null;
+  };
   pagination?: {
     hasMore: boolean;
     oldestTime: number | null;
@@ -156,5 +161,5 @@ export type MarketDataProvider = {
   name: string;
   getMarketRead(params: { symbol: string; range: string }): Promise<MarketRead>;
   getFlowRead(params?: { symbol?: string; range?: string }): Promise<FlowRead>;
-  getCandles(params: { symbol: string; frame: string; before?: number }): Promise<CandleRead>;
+  getCandles(params: { symbol: string; frame: string; before?: number; latest?: boolean }): Promise<CandleRead>;
 };

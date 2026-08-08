@@ -73,6 +73,7 @@ export function unavailableCandleRead(symbol: string, frame: string, note: strin
     provenance: source,
     quality: { completeness: 0, warnings: [note] },
     candles: [],
+    connection: { state: "unavailable", lastSuccessfulAt: null, pollIntervalSeconds: null },
   };
 }
 

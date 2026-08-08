@@ -39,7 +39,7 @@ type Props = {
   onExpand?: () => void;
 };
 
-const frames = ["1m", "5m", "10m", "1h", "1D"];
+const frames = ["1m", "5m", "10m", "15m", "1h", "1D"];
 
 export function ChartPanel({ title = "Chart With Levels", market, candles, range, onRange, frame, onFrame, onLoadOlderCandles, onExpand }: Props) {
   const availableMarket = market?.provenance.mode === "unavailable" ? null : market;
@@ -156,7 +156,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
           <button type="button" className="iconTool" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "Exit fullscreen chart" : "Enter fullscreen chart"} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>{isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
         </div>
       </div>
-      {activeCandle && <div className="chartOhlc" aria-live="polite"><span>O {price(activeCandle.open)}</span><span>H {price(activeCandle.high)}</span><span>L {price(activeCandle.low)}</span><span>C {price(activeCandle.close)}</span><span>V {activeCandle.volume.toLocaleString()}</span></div>}
+      {activeCandle && <div className="chartOhlc" aria-live="polite"><span>O {price(activeCandle.open)}</span><span>H {price(activeCandle.high)}</span><span>L {price(activeCandle.low)}</span><span>C {price(activeCandle.close)}</span><span>V {activeCandle.volume.toLocaleString()}</span><span title={`Provider: ${candles?.provenance.provider ?? "unavailable"}. Last successful update: ${candles?.connection?.lastSuccessfulAt ?? "N/A"}.`}>{candles?.connection?.state ?? candles?.provenance.mode ?? "unavailable"} · {frame}</span></div>}
       <div className="chartStage">
         <div className="chartCanvas">
           {showDrawingTools && <div className="drawingToolbar" aria-label="Drawing tools"><button type="button" className={classNames("iconTool", drawMode && "active")} onClick={() => setDrawMode((value) => !value)} aria-label="Draw horizontal line" title="Horizontal line"><PencilLine size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings((current) => current.slice(0, -1))} disabled={!canUndo} aria-label="Undo drawing" title="Undo"><Undo2 size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings([])} disabled={!canUndo} aria-label="Clear drawings" title="Clear"><Trash2 size={16} /></button></div>}

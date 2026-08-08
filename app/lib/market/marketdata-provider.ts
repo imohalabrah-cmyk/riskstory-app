@@ -726,6 +726,29 @@ export const marketDataProvider: MarketDataProvider = {
       const candles = parsed.slice(-CANDLE_BATCH_SIZE);
 
       if (!candles.length) {
+        if (before) {
+          const updatedAt = new Date().toISOString();
+          return {
+            schemaVersion: "1.0",
+            provider: "marketdata",
+            symbol,
+            frame,
+            updatedAt,
+            delayed: true,
+            provenance: {
+              provider: "marketdata",
+              mode: "delayed",
+              label: "Provider candles - delayed",
+              asOf: null,
+              receivedAt: updatedAt,
+              delayMinutes: null,
+              note: "No provider-backed candles were returned before the requested historical boundary.",
+            },
+            quality: { completeness: 100, warnings: [] },
+            candles: [],
+            pagination: { hasMore: false, oldestTime: null },
+          };
+        }
         throw new Error("No candle rows returned");
       }
 
@@ -755,7 +778,7 @@ export const marketDataProvider: MarketDataProvider = {
         },
         candles,
         pagination: {
-          hasMore: candles.length === CANDLE_BATCH_SIZE,
+          hasMore: true,
           oldestTime: candles[0]?.time ?? null,
         },
       };

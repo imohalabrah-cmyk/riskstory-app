@@ -73,6 +73,12 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
         if (!active || active.symbol !== symbol || active.frame !== frame) return existing;
         const knownTimes = new Set(active.candles.map((candle) => candle.time));
         const historical = older.candles.filter((candle) => !knownTimes.has(candle.time));
+        if (!historical.length) {
+          return {
+            ...existing,
+            candles: { ...active, pagination: { hasMore: false, oldestTime: active.candles[0]?.time ?? null } },
+          };
+        }
         const candles = [...historical, ...active.candles];
         return {
           ...existing,
@@ -80,7 +86,7 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
             ...active,
             candles,
             pagination: {
-              hasMore: older.pagination?.hasMore ?? false,
+              hasMore: older.pagination?.hasMore ?? true,
               oldestTime: candles[0]?.time ?? null,
             },
           },

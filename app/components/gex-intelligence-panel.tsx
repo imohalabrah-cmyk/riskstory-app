@@ -58,6 +58,40 @@ function scoreTone(score: number | null) {
 
 type Props = { market: MarketRead | null };
 
+function GexUnavailableState({ reason }: { reason: string }) {
+  return <section className="gexIntelligence gexUnavailable" aria-label="GEX intelligence unavailable">
+    <header className="gexTitleBar gexUnavailableTitle">
+      <div><span>GEX INTELLIGENCE</span><h2>Exposure structure unavailable</h2><p>{reason}</p></div>
+      <span className="gexUnavailableStatus">Provider data unavailable</span>
+    </header>
+
+    <div className="gexToolbar gexToolbarDisabled" aria-label="Unavailable GEX controls" aria-disabled="true">
+      <div className="gexControlGroup"><span className="gexControlLabel">Layer</span><div className="gexSegments">{layerOptions.map((item) => <button key={item.id} type="button" disabled>{item.label}</button>)}</div></div>
+      <div className="gexControlGroup"><span className="gexControlLabel">Exposure</span><div className="gexSegments"><button type="button" disabled>Gross</button><button type="button" disabled>Calls</button><button type="button" disabled>Puts</button></div></div>
+      <div className="gexControlGroup gexNoise"><span className="gexControlLabel">Noise filter</span><div className="gexSegments">{["All", "60+", "70+", "80+", "90+"].map((item) => <button key={item} type="button" disabled>{item}</button>)}</div></div>
+      <label className="gexSearch"><Search size={15} /><input disabled placeholder="Find strike" aria-label="Find nearest strike unavailable" /><button type="button" disabled>Go</button></label>
+      <div className="gexMapScale" aria-label="Map density unavailable"><button type="button" disabled>-</button><span>100%</span><button type="button" disabled>+</button></div>
+      <button type="button" className="gexReset" disabled><Focus size={14} /> Reset view</button>
+    </div>
+
+    <div className="gexScope"><Info size={14} /><span>The page structure remains available. Scores and provider-backed exposure will appear after a supported option-chain read is available.</span></div>
+
+    <div className="gexLayout" aria-busy="true">
+      <section className="gexMapPanel" aria-label="GEX map awaiting provider data">
+        <header><div><span>GEX MAP</span><h3>Exposure by strike</h3></div><div className="gexMapLegend"><span className="pending">Awaiting provider data</span></div></header>
+        <div className="gexMapCanvas gexSkeletonMap">{Array.from({ length: 9 }, (_, index) => <div className="gexSkeletonRow" key={index}><i /><span /><b /></div>)}<div className="gexSkeletonMessage"><strong>Provider-backed exposure required</strong><span>No strike values, bars, or scores are shown until data is available.</span></div></div>
+      </section>
+
+      <aside className="gexSidePanel" aria-label="GEX intelligence panels awaiting provider data">
+        <section className="gexClarityCard gexSkeletonCard"><span>Market clarity</span><i /><b>Unavailable</b><p>Requires current provider-backed exposure.</p></section>
+        <section className="gexStrongest gexSkeletonStrongest"><header><div><Sparkles size={15} /><span>Strongest levels</span></div><small>Awaiting data</small></header>{Array.from({ length: 5 }, (_, index) => <div className="gexSkeletonLevel" key={index}><i /><span /></div>)}</section>
+      </aside>
+    </div>
+
+    <section className="gexDetailPanel gexSkeletonDetail"><header><div><span>Selected level</span><h3>Unavailable</h3></div></header><div className="gexDetailScores">{["Confluence", "Level strength", "Isolation", "Open interest", "Net GEX"].map((item) => <div key={item}><small>{item}</small><i /></div>)}</div><div className="gexExplanation"><h4>Engine context</h4><p>Level-specific analysis becomes available only when the provider returns a supported option-chain exposure snapshot.</p></div></section>
+  </section>;
+}
+
 export function GexIntelligencePanel({ market }: Props) {
   const [layer, setLayer] = useState<Layer>("gex");
   const [side, setSide] = useState<Side>("combined");
@@ -103,7 +137,7 @@ export function GexIntelligencePanel({ market }: Props) {
   };
 
   if (!availableMarket || !intelligence || intelligence.availability === "unavailable") {
-    return <section className="gexIntelligence gexUnavailable"><header className="gexTitleBar"><div><span>GEX Intelligence</span><h2>Exposure structure unavailable</h2></div></header><div className="surfaceEmpty"><strong>GEX intelligence unavailable</strong><span>{intelligence?.warnings[0] ?? "Provider-backed option-chain exposure is required before this analysis can be displayed."}</span></div></section>;
+    return <GexUnavailableState reason={intelligence?.warnings[0] ?? "Provider-backed option-chain exposure is required before this analysis can be displayed."} />;
   }
 
   return <section className="gexIntelligence" aria-label="GEX intelligence">

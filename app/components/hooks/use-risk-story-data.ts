@@ -6,7 +6,7 @@ import type { OpenInterestDashboard } from "../../lib/open-interest/types";
 import type { AppData } from "../types";
 
 const CANDLE_POLL_INTERVAL_MS = 15 * 60 * 1000;
-const POLLABLE_CANDLE_AGE_MS = 30 * 60 * 1000;
+const POST_CANDLE_POLL_GRACE_MS = 30 * 60 * 1000;
 
 async function request<T>(path: string) {
   const response = await fetch(path, { cache: "no-store" });
@@ -43,10 +43,24 @@ function reconnectingRead(current: CandleRead): CandleRead {
   };
 }
 
+function frameWindowMs(frame: string) {
+  switch (frame.toLowerCase()) {
+    case "1m": return 60_000;
+    case "5m": return 5 * 60_000;
+    case "10m": return 10 * 60_000;
+    case "15m": return 15 * 60_000;
+    case "1h": return 60 * 60_000;
+    case "1d": return 24 * 60 * 60_000;
+    default: return null;
+  }
+}
+
 function canPoll(read: CandleRead | null) {
-  if (!isAvailable(read) || read.connection?.state === "unavailable") return false;
+  if (!isAvailable(read) || read.provider !== "marketdata" || read.connection?.state === "unavailable") return false;
   const asOf = read.provenance.asOf ? new Date(read.provenance.asOf).getTime() : Number.NaN;
-  return Number.isFinite(asOf) && Date.now() - asOf <= POLLABLE_CANDLE_AGE_MS;
+  const windowMs = frameWindowMs(read.frame);
+  if (!Number.isFinite(asOf) || !windowMs) return false;
+  return Date.now() <= asOf + windowMs + POST_CANDLE_POLL_GRACE_MS;
 }
 
 export function useRiskStoryData(symbol: string, range: string, frame: string) {

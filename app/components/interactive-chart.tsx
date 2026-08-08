@@ -114,20 +114,28 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
         return;
       }
       const maximum = Math.max(...rows.map((row) => Math.abs(row.netGex)), 1);
-      const next = rows.flatMap((row, index) => {
-        const candle = chartCandles[Math.max(0, chartCandles.length - 1 - (index % 4) * 5)];
-        const left = chart.timeScale().timeToCoordinate(candle.time as Time);
+      const currentCandle = chartCandles.at(-1);
+      if (!currentCandle) {
+        setBubbles([]);
+        return;
+      }
+      const left = chart.timeScale().timeToCoordinate(currentCandle.time as Time);
+      if (left === null) {
+        setBubbles([]);
+        return;
+      }
+      const next = rows.flatMap((row) => {
         const top = series.priceToCoordinate(row.strike);
-        if (left === null || top === null || top < 0 || top > container.clientHeight) return [];
+        if (top === null || top < 0 || top > container.clientHeight) return [];
         const ratio = Math.abs(row.netGex) / maximum;
         const size = Math.round(9 + Math.sqrt(ratio) * 12);
         return [{
-          key: `${row.strike}-${row.netGex}`,
+          key: `current-${row.strike}-${row.netGex}`,
           left,
           top,
           size,
           color: row.netGex >= 0 ? (ratio > .75 ? CHART_COLORS.gexStrong : CHART_COLORS.gexPositive) : CHART_COLORS.gexNegative,
-          label: `GEX ${row.netGex >= 0 ? "positive" : "negative"} ${row.strike.toLocaleString("en-US")}`,
+          label: `Current GEX ${row.netGex >= 0 ? "positive" : "negative"} ${row.strike.toLocaleString("en-US")}`,
         }];
       });
       setBubbles((current) => sameBubbleLayout(current, next) ? current : next);

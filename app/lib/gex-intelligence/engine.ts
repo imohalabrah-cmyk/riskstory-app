@@ -10,8 +10,12 @@ import type {
 
 const MAX_LEVELS = 12;
 const MAX_VACUUMS = 5;
+const ISOLATION_WINDOW = 2;
+const STRONG_LEVEL_SCORE = 70;
+const WEAK_LEVEL_SCORE = 45;
 
 type UsableStrike = ExposureStrike & { totalOpenInterest: number; magnitude: number };
+type StrengthRow = { row: UsableStrike; strength: IntelligenceScore };
 
 function clamp(value: number, minimum = 0, maximum = 100) {
   return Math.max(minimum, Math.min(maximum, value));
@@ -29,13 +33,6 @@ function direction(value: number, tolerance = 0): GexDirection {
   if (value > tolerance) return "positive";
   if (value < -tolerance) return "negative";
   return "balanced";
-}
-
-function median(values: number[]) {
-  const sorted = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
-  if (!sorted.length) return 0;
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
 function usableRows(market: MarketRead): UsableStrike[] {
@@ -61,51 +58,48 @@ function levelStrength(row: UsableStrike, maximumMagnitude: number, maximumOpenI
   };
 }
 
-function levelIsolation(rows: UsableStrike[], index: number, medianStep: number): IntelligenceScore {
-  if (!medianStep || rows.length < 3) {
-    return unavailable("Isolation needs at least three provider-backed strikes with a measurable spacing.");
+function levelIsolation(strengths: StrengthRow[], index: number): IntelligenceScore {
+  const ownStrength = strengths[index]?.strength.score;
+  const neighbors = strengths.filter((_, candidate) => (
+    candidate !== index && Math.abs(candidate - index) <= ISOLATION_WINDOW
+  ));
+  if (ownStrength === null || ownStrength === undefined || neighbors.length < 2) {
+    return unavailable("Isolation needs a scored level and at least two adjacent provider-backed strikes.");
   }
-  const previousGap = index > 0 ? rows[index].strike - rows[index - 1].strike : Number.NaN;
-  const nextGap = index < rows.length - 1 ? rows[index + 1].strike - rows[index].strike : Number.NaN;
-  const usableGaps = [previousGap, nextGap].filter((gap) => Number.isFinite(gap) && gap > 0);
-  if (!usableGaps.length) return unavailable("No neighboring provider-backed strike is available to measure isolation.");
 
-  const averageGap = usableGaps.reduce((total, gap) => total + gap, 0) / usableGaps.length;
+  const neighboringStrength = neighbors.reduce((total, item) => total + (item.strength.score || 0), 0) / neighbors.length;
+  // A level is isolated only when it is strong itself and its surrounding exposure is materially weaker.
+  const contrast = clamp((ownStrength - neighboringStrength) / Math.max(100 - neighboringStrength, 1) * 100);
+  const neighborhoodWeakness = 100 - neighboringStrength;
+  const ownStrengthGate = 0.6 + ownStrength / 100 * 0.4;
   return {
-    score: roundScore((averageGap / medianStep - 1) / 2 * 100),
+    score: roundScore((contrast * 0.7 + neighborhoodWeakness * 0.3) * ownStrengthGate),
     availability: "available",
-    explanation: "Spacing score derived from adjacent available strikes; it does not infer order-book liquidity.",
-    inputs: ["strike spacing"],
+    explanation: "Relative prominence score comparing this level's current GEX/OI strength with the nearest available surrounding strikes.",
+    inputs: ["level strength", "neighboring netGex", "neighboring open interest"],
   };
 }
 
-function levelConfluence(market: MarketRead, row: UsableStrike, step: number, strength: IntelligenceScore): IntelligenceScore {
-  const tolerance = Math.max(step / 2, row.strike * 0.0005);
-  const matches = market.levels.filter((level) => Math.abs(level.price - row.strike) <= tolerance);
-  if (!matches.length) {
-    return {
-      score: roundScore((strength.score || 0) * 0.45),
-      availability: "available",
-      explanation: "No named market level currently matches this strike; score reflects only the local GEX concentration.",
-      inputs: ["netGex", "open interest"],
-    };
+function levelConfluence(row: UsableStrike, spot: number, strength: IntelligenceScore, isolation: IntelligenceScore): IntelligenceScore {
+  if (strength.score === null || isolation.score === null || !(spot > 0)) {
+    return unavailable("Confluence needs a valid spot price plus strength and isolation scores.");
   }
-  const namedStrength = matches.reduce((total, level) => total + level.strength, 0) / matches.length;
+  const proximity = clamp((1 - Math.abs(row.strike - spot) / Math.max(spot * 0.05, 1)) * 100);
   return {
-    score: roundScore((strength.score || 0) * 0.55 + namedStrength * 0.45),
+    score: roundScore(strength.score * 0.5 + isolation.score * 0.3 + proximity * 0.2),
     availability: "available",
-    explanation: "Local GEX concentration aligns with one or more provider-derived market levels at this strike.",
-    inputs: ["netGex", "open interest", "market levels"],
+    explanation: "Composite local-context score from this level's strength, surrounding-exposure contrast, and distance from the provider-backed spot price. These are related snapshot descriptors, not independent confirmation sources.",
+    inputs: ["level strength", "level isolation", "spot price"],
   };
 }
 
-function buildLevels(market: MarketRead, rows: UsableStrike[], spot: number) {
+function buildLevels(rows: UsableStrike[], spot: number) {
   const maximumMagnitude = Math.max(...rows.map((row) => row.magnitude), 1);
   const maximumOpenInterest = Math.max(...rows.map((row) => row.totalOpenInterest), 1);
-  const medianStep = median(rows.slice(1).map((row, index) => row.strike - rows[index].strike));
-  const strongest = rows
-    .map((row, index): GexLevelAssessment => {
-      const strength = levelStrength(row, maximumMagnitude, maximumOpenInterest);
+  const strengths = rows.map((row) => ({ row, strength: levelStrength(row, maximumMagnitude, maximumOpenInterest) }));
+  const strongest = strengths
+    .map(({ row, strength }, index): GexLevelAssessment => {
+      const isolation = levelIsolation(strengths, index);
       return {
         strike: row.strike,
         netGex: row.netGex,
@@ -114,15 +108,15 @@ function buildLevels(market: MarketRead, rows: UsableStrike[], spot: number) {
         distancePoints: Math.abs(row.strike - spot),
         distancePercent: spot > 0 ? Math.abs(row.strike - spot) / spot * 100 : 0,
         levelStrength: strength,
-        levelIsolation: levelIsolation(rows, index, medianStep),
-        confluence: levelConfluence(market, row, medianStep, strength),
+        levelIsolation: isolation,
+        confluence: levelConfluence(row, spot, strength, isolation),
       };
     })
     .sort((left, right) => (right.levelStrength.score || 0) - (left.levelStrength.score || 0)
       || left.distancePoints - right.distancePoints)
     .slice(0, MAX_LEVELS);
 
-  return { strongest, maximumMagnitude, medianStep };
+  return { strongest, strengths, maximumMagnitude };
 }
 
 function vacuumLocation(lowStrike: number, highStrike: number, spot: number): VacuumLocation {
@@ -131,38 +125,56 @@ function vacuumLocation(lowStrike: number, highStrike: number, spot: number): Va
   return "crosses_spot";
 }
 
-function liquidityVacuum(rows: UsableStrike[], spot: number, maximumMagnitude: number, medianStep: number) {
-  if (rows.length < 2 || !medianStep) {
-    return { ...unavailable("Liquidity-vacuum scoring needs at least two regularly spaced provider-backed strikes."), intervals: [] as LiquidityVacuumInterval[] };
+function liquidityVacuum(strengths: StrengthRow[], spot: number) {
+  if (strengths.length < 3) {
+    return { ...unavailable("Low-exposure interval scoring needs at least three provider-backed strikes."), intervals: [] as LiquidityVacuumInterval[] };
   }
 
-  const intervals = rows.slice(1).map((right, index): LiquidityVacuumInterval => {
-    const left = rows[index];
-    const averageMagnitude = (left.magnitude + right.magnitude) / 2;
-    const exposureWeakness = 1 - averageMagnitude / maximumMagnitude;
-    const spacing = right.strike - left.strike;
-    const gapFactor = clamp((spacing / medianStep - 1) / 2);
-    const score = roundScore(exposureWeakness * 75 + gapFactor * 25);
-    return {
-      lowStrike: left.strike,
-      highStrike: right.strike,
-      location: vacuumLocation(left.strike, right.strike, spot),
+  const intervals: LiquidityVacuumInterval[] = [];
+  let index = 0;
+  while (index < strengths.length) {
+    if ((strengths[index].strength.score || 0) > WEAK_LEVEL_SCORE) {
+      index += 1;
+      continue;
+    }
+    const start = index;
+    while (index < strengths.length && (strengths[index].strength.score || 0) <= WEAK_LEVEL_SCORE) index += 1;
+    const end = index - 1;
+    const leftBoundary = strengths[start - 1];
+    const rightBoundary = strengths[index];
+    if (!leftBoundary || !rightBoundary || (leftBoundary.strength.score || 0) < STRONG_LEVEL_SCORE || (rightBoundary.strength.score || 0) < STRONG_LEVEL_SCORE) continue;
+
+    const weakSegment = strengths.slice(start, end + 1);
+    const averageWeakStrength = weakSegment.reduce((total, item) => total + (item.strength.score || 0), 0) / weakSegment.length;
+    const boundaryStrength = ((leftBoundary.strength.score || 0) + (rightBoundary.strength.score || 0)) / 2;
+    const weakness = 100 - averageWeakStrength;
+    const contrast = clamp(boundaryStrength - averageWeakStrength);
+    const continuity = clamp(weakSegment.length / 3 * 100);
+    const score = roundScore(weakness * 0.45 + contrast * 0.45 + continuity * 0.1);
+    const lowStrike = leftBoundary.row.strike;
+    const highStrike = rightBoundary.row.strike;
+    intervals.push({
+      lowStrike,
+      highStrike,
+      location: vacuumLocation(lowStrike, highStrike, spot),
       score,
-      explanation: "Relative low-exposure interval derived from adjacent current GEX strikes and their spacing; it is not a prediction of price travel.",
-    };
-  })
+      explanation: "Consecutive low-exposure strikes bounded by stronger current GEX/OI concentrations. This describes option-chain exposure only, not order-book liquidity or a price forecast.",
+    });
+  }
+
+  const ranked = intervals
     .filter((interval) => interval.score >= 45)
     .sort((left, right) => right.score - left.score)
     .slice(0, MAX_VACUUMS);
 
   return {
-    score: intervals.length ? roundScore(intervals.reduce((total, interval) => total + interval.score, 0) / intervals.length) : 0,
+    score: ranked.length ? roundScore(ranked.reduce((total, interval) => total + interval.score, 0) / ranked.length) : 0,
     availability: "available" as const,
-    explanation: intervals.length
-      ? "Score summarizes the strongest low-exposure intervals in the current chain snapshot."
+    explanation: ranked.length
+      ? "Score summarizes the strongest current low-exposure intervals bounded by stronger option-chain concentrations."
       : "No material low-exposure interval was found in the current chain snapshot.",
-    inputs: ["netGex", "strike spacing"],
-    intervals,
+    inputs: ["netGex", "callOpenInterest", "putOpenInterest", "neighboring exposure strength"],
+    intervals: ranked,
   };
 }
 
@@ -192,8 +204,8 @@ function overallConfluence(levels: GexLevelAssessment[], clarity: IntelligenceSc
   return {
     score: roundScore(levelScore * 0.55 + isolation * 0.15 + clarity.score * 0.3),
     availability: "available" as const,
-    explanation: "Composite consistency score for the strongest current GEX levels, their spacing, named-level alignment, and market clarity. It does not express a trading direction.",
-    inputs: ["level strength", "level isolation", "market levels", "market clarity"],
+    explanation: "Composite local-context score for the strongest current GEX levels, their surrounding-exposure contrast, and market clarity. Inputs are related descriptors from one chain snapshot and are not treated as independent evidence.",
+    inputs: ["level strength", "level isolation", "market clarity"],
   };
 }
 
@@ -226,8 +238,8 @@ export function analyzeGexIntelligence(market: MarketRead): GexIntelligenceRead 
     };
   }
 
-  const { strongest, maximumMagnitude, medianStep } = buildLevels(market, rows, spot);
-  const vacuum = liquidityVacuum(rows, spot, maximumMagnitude, medianStep);
+  const { strongest, strengths, maximumMagnitude } = buildLevels(rows, spot);
+  const vacuum = liquidityVacuum(strengths, spot);
   const clarity = marketClarity(rows, market, maximumMagnitude);
   return {
     schemaVersion: "1.0",

@@ -20,11 +20,11 @@ Measures each strike relative to the largest absolute current net GEX and the la
 
 ### Level Isolation
 
-Measures the spacing between a strike and its available adjacent strikes relative to the median strike spacing. It does **not** claim order-book liquidity. It is unavailable when the chain lacks enough usable strikes for a spacing comparison.
+Measures whether a level is materially stronger than the nearest available strikes around it. The calculation compares the current level's composite GEX/OI strength against a two-strike neighborhood on each side where available. A low-strength level cannot receive a high isolation score solely because nearby values are even lower. Strike spacing is not an isolation input.
 
 ### Liquidity Vacuum
 
-Finds intervals between adjacent strikes that combine relatively low GEX magnitude with wider-than-usual spacing. These are labelled as low-exposure intervals, not directional paths or price targets.
+Finds consecutive low-exposure strikes bounded by strong current GEX/OI concentrations. These are labelled as low-exposure intervals, not order-book liquidity, directional paths, or price targets. Strike spacing is not an input.
 
 ### Market Clarity
 
@@ -32,7 +32,7 @@ Summarizes three snapshot properties: net GEX directional imbalance, concentrati
 
 ### Confluence Score
 
-Combines the strongest level confluence values, their isolation, and market clarity. A level receives named-level alignment only when it matches existing `MarketRead.levels` inside a tolerance based on available strike spacing. This score describes internal consistency across the same snapshot; it does not make an execution recommendation.
+Combines the strongest local level-context scores, their isolation, and market clarity. It deliberately does not use `MarketRead.levels` as an additional weighted signal because those levels may be derived from the same GEX/OI chain inputs. The score describes internal consistency within one snapshot, not independent confirmation or an execution recommendation.
 
 ## Extension boundary
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CandleRead, FlowRead, MarketRead } from "../../lib/market/types";
 import type { OpenInterestDashboard } from "../../lib/open-interest/types";
 import type { AppData } from "../types";
@@ -15,6 +15,12 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
   const [data, setData] = useState<AppData>({ market: null, trinity: { SPX: null, SPY: null, QQQ: null }, candles: null, flow: null, openInterest: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const dataRef = useRef(data);
+  const loadingOlderRef = useRef(false);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -45,5 +51,45 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
     const timeout = window.setTimeout(() => { void refresh(); }, 0);
     return () => window.clearTimeout(timeout);
   }, [refresh]);
-  return { data, loading, error, refresh };
+
+  const loadOlderCandles = useCallback(async (before: number) => {
+    const current = dataRef.current.candles;
+    if (loadingOlderRef.current || !current?.candles.length || current.pagination?.hasMore === false) return;
+
+    loadingOlderRef.current = true;
+    try {
+      const query = new URLSearchParams({ symbol, frame, before: String(before) });
+      const older = await request<CandleRead>(`/api/candles?${query}`);
+      if (older.provenance.mode === "unavailable" || !older.candles.length) {
+        setData((existing) => existing.candles && existing.candles.symbol === symbol && existing.candles.frame === frame ? {
+          ...existing,
+          candles: { ...existing.candles, pagination: { hasMore: false, oldestTime: existing.candles.candles[0]?.time ?? null } },
+        } : existing);
+        return;
+      }
+
+      setData((existing) => {
+        const active = existing.candles;
+        if (!active || active.symbol !== symbol || active.frame !== frame) return existing;
+        const knownTimes = new Set(active.candles.map((candle) => candle.time));
+        const historical = older.candles.filter((candle) => !knownTimes.has(candle.time));
+        const candles = [...historical, ...active.candles];
+        return {
+          ...existing,
+          candles: {
+            ...active,
+            candles,
+            pagination: {
+              hasMore: older.pagination?.hasMore ?? false,
+              oldestTime: candles[0]?.time ?? null,
+            },
+          },
+        };
+      });
+    } finally {
+      loadingOlderRef.current = false;
+    }
+  }, [frame, symbol]);
+
+  return { data, loading, error, refresh, loadOlderCandles };
 }

@@ -121,6 +121,10 @@ export type CandleRead = {
   provenance: DataProvenance;
   quality: DataQuality;
   candles: Candle[];
+  pagination?: {
+    hasMore: boolean;
+    oldestTime: number | null;
+  };
 };
 
 export type FlowSide = "Call" | "Put";
@@ -152,5 +156,5 @@ export type MarketDataProvider = {
   name: string;
   getMarketRead(params: { symbol: string; range: string }): Promise<MarketRead>;
   getFlowRead(params?: { symbol?: string; range?: string }): Promise<FlowRead>;
-  getCandles(params: { symbol: string; frame: string }): Promise<CandleRead>;
+  getCandles(params: { symbol: string; frame: string; before?: number }): Promise<CandleRead>;
 };

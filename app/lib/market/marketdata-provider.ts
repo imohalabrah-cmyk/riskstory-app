@@ -128,15 +128,19 @@ function candleResolution(frame: string) {
   return "10";
 }
 
-function candleLookbackDays(frame: string) {
+const CANDLE_BATCH_SIZE = 320;
+
+function candleBatchLookbackDays(frame: string) {
   const normalized = frame.toLowerCase();
-  if (normalized.includes("1d") || normalized.includes("daily")) return 120;
-  if (normalized.includes("1h") || normalized.includes("60")) return 30;
-  return 10;
+  if (normalized.includes("1d") || normalized.includes("daily")) return 380;
+  if (normalized.includes("1h") || normalized.includes("60")) return 70;
+  if (normalized.includes("5m")) return 5;
+  if (normalized.includes("15m")) return 12;
+  return 8;
 }
 
-function isoDateDaysAgo(days: number) {
-  const date = new Date();
+function isoDateDaysBefore(reference: Date, days: number) {
+  const date = new Date(reference);
   date.setUTCDate(date.getUTCDate() - days);
   return date.toISOString().slice(0, 10);
 }
@@ -711,13 +715,15 @@ export const marketDataProvider: MarketDataProvider = {
     return unavailableFlowRead("MarketData does not provide sweep, split, block, or dark-pool flow through this adapter.");
   },
 
-  async getCandles({ symbol, frame }) {
+  async getCandles({ symbol, frame, before }) {
     try {
       const resolution = candleResolution(frame);
-      const to = new Date().toISOString().slice(0, 10);
-      const from = isoDateDaysAgo(candleLookbackDays(frame));
+      const end = Number.isFinite(before) && before && before > 0 ? new Date(before * 1000) : new Date();
+      const to = end.toISOString().slice(0, 10);
+      const from = isoDateDaysBefore(end, candleBatchLookbackDays(frame));
       const data = await requestJson(`/stocks/candles/${resolution}/${encodeURIComponent(symbol)}/?from=${from}&to=${to}`);
-      const candles = parseCandles(data).slice(-160);
+      const parsed = parseCandles(data).filter((candle) => !before || candle.time < before);
+      const candles = parsed.slice(-CANDLE_BATCH_SIZE);
 
       if (!candles.length) {
         throw new Error("No candle rows returned");
@@ -748,6 +754,10 @@ export const marketDataProvider: MarketDataProvider = {
           warnings: ["Realtime entitlement has not been verified; candles are labeled delayed."],
         },
         candles,
+        pagination: {
+          hasMore: candles.length === CANDLE_BATCH_SIZE,
+          oldestTime: candles[0]?.time ?? null,
+        },
       };
     } catch (error) {
       return unavailableCandleRead(symbol, frame, error instanceof Error ? error.message : "MarketData candle request failed.");

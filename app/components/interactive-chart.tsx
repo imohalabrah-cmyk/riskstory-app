@@ -10,6 +10,8 @@ type GexMode = "off" | "bubbles" | "levels" | "both";
 
 type Props = {
   candles: Candle[];
+  hasMoreCandles: boolean;
+  onLoadOlderCandles?: (before: number) => Promise<void>;
   market: MarketRead;
   drawMode: boolean;
   drawings: number[];
@@ -58,7 +60,7 @@ function sameBubbleLayout(current: Bubble[], next: Bubble[]) {
   });
 }
 
-export function InteractiveChart({ candles, market, drawMode, drawings, onAddDrawing, gexMode, showLevels, showVolume, showGrid, showCrosshair, fitNonce, onCrosshairCandle }: Props) {
+export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, market, drawMode, drawings, onAddDrawing, gexMode, showLevels, showVolume, showGrid, showCrosshair, fitNonce, onCrosshairCandle }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<CandleSeries | null>(null);
@@ -78,6 +80,10 @@ export function InteractiveChart({ candles, market, drawMode, drawings, onAddDra
   const showVolumeRef = useRef(showVolume);
   const showGridRef = useRef(showGrid);
   const showCrosshairRef = useRef(showCrosshair);
+  const hasMoreCandlesRef = useRef(hasMoreCandles);
+  const onLoadOlderCandlesRef = useRef(onLoadOlderCandles);
+  const loadingOlderRef = useRef(false);
+  const visibleRangeHandlerRef = useRef<((range: { from: number; to: number } | null) => void) | null>(null);
   const frameRef = useRef<number | null>(null);
   const lastCrosshairTimeRef = useRef<number | null>(null);
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
@@ -135,12 +141,21 @@ export function InteractiveChart({ candles, market, drawMode, drawings, onAddDra
     const previous = previousCandlesRef.current;
     const nextLast = nextCandles.at(-1);
     const canUpdate = Boolean(nextLast) && (equivalentTimeline(previous, nextCandles) || (nextCandles.length === previous.length + 1 && previous.every((candle, index) => candle.time === nextCandles[index]?.time)));
+    const prependedCount = nextCandles.length - previous.length;
+    const prepended = prependedCount > 0 && previous.every((candle, index) => candle.time === nextCandles[prependedCount + index]?.time);
+    const visibleRange = prepended ? chartRef.current?.timeScale().getVisibleLogicalRange() ?? null : null;
     if (canUpdate && nextLast) {
       series.update({ ...nextLast, time: nextLast.time as Time });
       volume.update(volumeBars([nextLast])[0]);
     } else {
       series.setData(chartCandles(nextCandles));
       volume.setData(volumeBars(nextCandles));
+      if (prepended && visibleRange) {
+        chartRef.current?.timeScale().setVisibleLogicalRange({
+          from: visibleRange.from + prependedCount,
+          to: visibleRange.to + prependedCount,
+        });
+      }
     }
     previousCandlesRef.current = nextCandles;
     scheduleBubbleSync();
@@ -187,6 +202,8 @@ export function InteractiveChart({ candles, market, drawMode, drawings, onAddDra
   useEffect(() => { drawModeRef.current = drawMode; }, [drawMode]);
   useEffect(() => { onAddDrawingRef.current = onAddDrawing; }, [onAddDrawing]);
   useEffect(() => { onCrosshairCandleRef.current = onCrosshairCandle; }, [onCrosshairCandle]);
+  useEffect(() => { hasMoreCandlesRef.current = hasMoreCandles; }, [hasMoreCandles]);
+  useEffect(() => { onLoadOlderCandlesRef.current = onLoadOlderCandles; }, [onLoadOlderCandles]);
   useEffect(() => {
     latestCandlesRef.current = candles;
     syncCandles(candles);
@@ -276,17 +293,30 @@ export function InteractiveChart({ candles, market, drawMode, drawings, onAddDra
         lastCrosshairTimeRef.current = time;
         onCrosshairCandleRef.current(time === null ? null : latestCandlesRef.current.find((candle) => candle.time === time) ?? null);
       });
-      chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleBubbleSync);
+       const handleVisibleRangeChange = (range: { from: number; to: number } | null) => {
+         scheduleBubbleSync();
+         const oldest = latestCandlesRef.current[0];
+         const loadOlder = onLoadOlderCandlesRef.current;
+         if (!range || range.from > 14 || !oldest || !loadOlder || !hasMoreCandlesRef.current || loadingOlderRef.current) return;
+         loadingOlderRef.current = true;
+         void loadOlder(oldest.time).finally(() => { loadingOlderRef.current = false; });
+       };
+       visibleRangeHandlerRef.current = handleVisibleRangeChange;
+       chart.timeScale().subscribeVisibleLogicalRangeChange(handleVisibleRangeChange);
       observer = new ResizeObserver(() => {
         chart.resize(container.clientWidth, container.clientHeight || 560);
         scheduleBubbleSync();
       });
-      observer.observe(container);
+       observer.observe(container);
     });
 
     return () => {
       disposed = true;
       observer?.disconnect();
+       if (chartRef.current && visibleRangeHandlerRef.current) {
+         chartRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(visibleRangeHandlerRef.current);
+       }
+       visibleRangeHandlerRef.current = null;
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       chartRef.current?.remove();
       chartRef.current = null;

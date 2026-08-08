@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
+import type { ReactNode, RefObject } from "react";
 import {
   CandlestickChart,
   Crosshair,
@@ -17,6 +18,7 @@ import {
   Trash2,
   Undo2,
   Volume2,
+  X,
 } from "lucide-react";
 import type { Candle, CandleRead, MarketRead } from "../lib/market/types";
 import { InteractiveChart } from "./interactive-chart";
@@ -48,12 +50,16 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
   const [showGrid, setShowGrid] = useState(true);
   const [showCrosshair, setShowCrosshair] = useState(true);
   const [showDrawingTools, setShowDrawingTools] = useState(true);
-  const [activePopover, setActivePopover] = useState<"settings" | "data" | null>(null);
+  const [activePopover, setActivePopover] = useState<"data" | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [fitNonce, setFitNonce] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedCandle, setSelectedCandle] = useState<Candle | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const wasSettingsOpenRef = useRef(false);
 
   const addDrawing = useCallback((value: number) => setDrawings((current) => [...current, Math.round(value * 100) / 100]), []);
   const toggleFullscreen = useCallback(async () => {
@@ -65,7 +71,11 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
 
   useEffect(() => {
     const updateFullscreen = () => setIsFullscreen(document.fullscreenElement === stageRef.current);
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setActivePopover(null); };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setActivePopover(null);
+      setSettingsOpen(false);
+    };
     document.addEventListener("fullscreenchange", updateFullscreen);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
@@ -82,14 +92,21 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
     return () => document.removeEventListener("mousedown", closeOnOutsidePointer);
   }, [activePopover]);
 
+  useEffect(() => {
+    if (settingsOpen) settingsCloseButtonRef.current?.focus();
+    else if (wasSettingsOpenRef.current) settingsButtonRef.current?.focus();
+    wasSettingsOpenRef.current = settingsOpen;
+  }, [settingsOpen]);
+
   const levels = availableMarket ? [
     ["Call wall", availableMarket.snapshot.callWall, "call"], ["Zero gamma", availableMarket.snapshot.zeroGamma, "zero"], ["Spot", availableMarket.snapshot.spot, "spot"], ["Put wall", availableMarket.snapshot.putWall, "put"],
-  ] as const : [];
+  ] as const : [["Call wall", null, "call"], ["Zero gamma", null, "zero"], ["Spot", null, "spot"], ["Put wall", null, "put"]] as const;
   const hasGex = Boolean(availableMarket?.exposure?.rows.length);
   const canUndo = drawings.length > 0;
   const activeCandle = selectedCandle ?? candles?.candles.at(-1) ?? null;
 
-  return <Panel title={title} onExpand={onExpand} className="chartPanel">
+  return <>
+  <Panel title={title} onExpand={onExpand} className="chartPanel">
     <div className="chartTerminal" ref={stageRef}>
       <div className="chartToolbar" aria-label="Chart controls" ref={popoverRef}>
         <div className="chartToolbarGroup chartIdentity"><CandlestickChart size={15} aria-hidden="true" /><strong>{availableMarket?.symbol ?? "--"}</strong><span>{frame}</span></div>
@@ -108,17 +125,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
           <button type="button" className="iconTool" onClick={() => setDrawings((current) => current.slice(0, -1))} disabled={!canUndo} aria-label="Undo last drawing" title="Undo"><Undo2 size={15} /></button>
           <button type="button" className="iconTool" onClick={() => setDrawings([])} disabled={!canUndo} aria-label="Clear drawings" title="Clear drawings"><Trash2 size={15} /></button>
           <button type="button" className="iconTool" onClick={() => setFitNonce((value) => value + 1)} aria-label="Fit chart content" title="Fit chart"><RotateCcw size={15} /></button>
-          <div className="chartSettings">
-            <button type="button" className={classNames("iconTool", activePopover === "settings" && "active")} onClick={() => setActivePopover((current) => current === "settings" ? null : "settings")} aria-label="Chart settings" aria-expanded={activePopover === "settings"} title="Chart settings"><Settings2 size={15} /></button>
-            {activePopover === "settings" && <div className="chartPopover" role="dialog" aria-label="Chart display settings">
-              <strong>Chart settings</strong>
-              <Toggle label="Market levels" checked={showLevels} onChange={setShowLevels} icon={showLevels ? <Eye size={14} /> : <EyeOff size={14} />} />
-              <Toggle label="Volume" checked={showVolume} onChange={setShowVolume} icon={<Volume2 size={14} />} />
-              <Toggle label="Grid lines" checked={showGrid} onChange={setShowGrid} icon={<Grid3X3 size={14} />} />
-              <Toggle label="Crosshair" checked={showCrosshair} onChange={setShowCrosshair} icon={<Crosshair size={14} />} />
-              <Toggle label="Drawing tools" checked={showDrawingTools} onChange={setShowDrawingTools} icon={<PencilLine size={14} />} />
-            </div>}
-          </div>
+          <button ref={settingsButtonRef} type="button" className={classNames("iconTool", settingsOpen && "active")} onClick={() => { setActivePopover(null); setSettingsOpen(true); }} aria-label="Chart settings" aria-expanded={settingsOpen} title="Chart settings"><Settings2 size={15} /></button>
           <button type="button" className="iconTool" onClick={() => void toggleFullscreen()} aria-label={isFullscreen ? "Exit fullscreen chart" : "Enter fullscreen chart"} title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}>{isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
         </div>
       </div>
@@ -128,10 +135,12 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
           {showDrawingTools && <div className="drawingToolbar" aria-label="Drawing tools"><button type="button" className={classNames("iconTool", drawMode && "active")} onClick={() => setDrawMode((value) => !value)} aria-label="Draw horizontal line" title="Horizontal line"><PencilLine size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings((current) => current.slice(0, -1))} disabled={!canUndo} aria-label="Undo drawing" title="Undo"><Undo2 size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings([])} disabled={!canUndo} aria-label="Clear drawings" title="Clear"><Trash2 size={16} /></button></div>}
           {!availableMarket || !candles?.candles.length ? <div className="surfaceEmpty"><strong>Chart data unavailable</strong><span>Sync the market feed to load provider-backed candles.</span></div> : <InteractiveChart market={availableMarket} candles={candles.candles} drawMode={drawMode} drawings={drawings} onAddDrawing={addDrawing} gexMode={gexMode} showLevels={showLevels} showVolume={showVolume} showGrid={showGrid} showCrosshair={showCrosshair} fitNonce={fitNonce} onCrosshairCandle={setSelectedCandle} />}
         </div>
-        <aside className="levels"><label>Market levels</label>{levels.map(([name, value, kind]) => <div className={`level ${kind}`} key={name}><i /><div><b>{price(value)}</b><small>{name}</small></div></div>)}<p className="levelSource">GEX overlay uses model-calculated chain exposure when available.</p></aside>
+        <aside className="levels"><label>Market levels</label>{levels.map(([name, value, kind]) => <div className={`level ${kind}`} key={name}><i /><div><b>{value === null ? "N/A" : price(value)}</b><small>{name}</small></div></div>)}<p className="levelSource">GEX overlay uses model-calculated chain exposure when available.</p></aside>
       </div>
     </div>
-  </Panel>;
+  </Panel>
+  {settingsOpen && createPortal(<ChartSettingsModal closeButtonRef={settingsCloseButtonRef} onClose={() => setSettingsOpen(false)} showLevels={showLevels} setShowLevels={setShowLevels} showVolume={showVolume} setShowVolume={setShowVolume} showGrid={showGrid} setShowGrid={setShowGrid} showCrosshair={showCrosshair} setShowCrosshair={setShowCrosshair} showDrawingTools={showDrawingTools} setShowDrawingTools={setShowDrawingTools} />, document.body)}
+  </>;
 }
 
 function Toggle({ label, checked, onChange, icon }: { label: string; checked: boolean; onChange: (checked: boolean) => void; icon: ReactNode }) {
@@ -140,4 +149,35 @@ function Toggle({ label, checked, onChange, icon }: { label: string; checked: bo
 
 function DataStatus({ label, reason }: { label: string; reason: string }) {
   return <div className="dataStatus"><span>{label}</span><small>Unavailable - {reason}</small></div>;
+}
+
+type ChartSettingsModalProps = {
+  closeButtonRef: RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+  showLevels: boolean;
+  setShowLevels: (checked: boolean) => void;
+  showVolume: boolean;
+  setShowVolume: (checked: boolean) => void;
+  showGrid: boolean;
+  setShowGrid: (checked: boolean) => void;
+  showCrosshair: boolean;
+  setShowCrosshair: (checked: boolean) => void;
+  showDrawingTools: boolean;
+  setShowDrawingTools: (checked: boolean) => void;
+};
+
+function ChartSettingsModal({ closeButtonRef, onClose, showLevels, setShowLevels, showVolume, setShowVolume, showGrid, setShowGrid, showCrosshair, setShowCrosshair, showDrawingTools, setShowDrawingTools }: ChartSettingsModalProps) {
+  return <div className="chartSettingsModalBackdrop" role="presentation" onMouseDown={onClose}>
+    <section className="chartSettingsModal" role="dialog" aria-modal="true" aria-labelledby="chart-settings-title" onMouseDown={(event) => event.stopPropagation()}>
+      <header><div><span>CHART SETTINGS</span><h2 id="chart-settings-title">Display and behavior</h2></div><button ref={closeButtonRef} type="button" className="iconTool" onClick={onClose} aria-label="Close chart settings"><X size={17} /></button></header>
+      <div className="chartSettingsGrid">
+        <section><h3>Market Levels</h3><Toggle label="Show Spot, Call Wall, Put Wall, and Zero Gamma" checked={showLevels} onChange={setShowLevels} icon={showLevels ? <Eye size={15} /> : <EyeOff size={15} />} /></section>
+        <section><h3>GEX</h3><p>Use the toolbar control for Bubbles, Levels, Both, or Off. It stays disabled until provider-backed exposure is available.</p></section>
+        <section><h3>Dark Pool</h3><p>Unavailable until the connected provider returns dark-pool levels.</p></section>
+        <section><h3>Flow and Whales</h3><p>Unavailable until the provider returns chart-safe timestamps and classifications.</p></section>
+        <section><h3>Appearance</h3><Toggle label="Volume histogram" checked={showVolume} onChange={setShowVolume} icon={<Volume2 size={15} />} /><Toggle label="Grid lines" checked={showGrid} onChange={setShowGrid} icon={<Grid3X3 size={15} />} /></section>
+        <section><h3>Chart Behavior</h3><Toggle label="Crosshair" checked={showCrosshair} onChange={setShowCrosshair} icon={<Crosshair size={15} />} /><Toggle label="Drawing toolbar" checked={showDrawingTools} onChange={setShowDrawingTools} icon={<PencilLine size={15} />} /></section>
+      </div>
+    </section>
+  </div>;
 }

@@ -11,6 +11,12 @@ yarn-debug.log*
 yarn-error.log*
 dev.stdout.log
 dev.stderr.log
+*.err.log
+*.out.log
+*.pid
+dist
+*.tar
+*.tar.gz
 
 # OpenNext
 .open-next

@@ -12,6 +12,7 @@ import { HeatmapPanel } from "./heatmap-panel";
 import { TrinityPanel } from "./trinity-panel";
 import { OpenInterestPanel } from "./open-interest-panel";
 import { AlertsPanel } from "./alerts-panel";
+import { MarketStoryPanel } from "./market-story-panel";
 import { useRiskStoryData } from "./hooks/use-risk-story-data";
 import type { ViewId } from "./types";
 
@@ -27,6 +28,7 @@ export function RiskStoryApp() {
     <main className="main"><Header view={view} symbol={symbol} onSymbol={setSymbol} onRefresh={() => void refresh()} loading={loading} />
       <section className="workspace" aria-busy={loading}>{error && <p className="dataNotice">{error}</p>}
         {view === "command" && <div className="commandView"><Dashboard market={data.market} loading={loading} /><div className="commandPrimary"><ChartPanel market={data.market} candles={data.candles} range={range} onRange={setRange} frame={frame} onFrame={setFrame} onLoadOlderCandles={loadOlderCandles} onExpand={() => expand("chart")} /><FlowPanel flow={data.flow} compact /></div><div className="commandSecondary"><TrinityPanel reads={data.trinity} onExpand={() => expand("trinity")} /><HeatmapPanel market={data.market} onExpand={() => expand("heatmap")} onSymbol={setSymbol} compact /></div></div>}
+        {view === "marketStory" && <MarketStoryPanel market={data.market} onNavigate={setView} />}
         {view === "gamma" && <div className="gammaView"><Dashboard market={data.market} loading={loading} /><ChartPanel title="Gamma Chart" market={data.market} candles={data.candles} range={range} onRange={setRange} frame={frame} onFrame={setFrame} onLoadOlderCandles={loadOlderCandles} /><GammaPanel market={data.market} /></div>}
         {view === "gex" && <GexIntelligencePanel market={data.market} />}
         {view === "heatmap" && <HeatmapPanel market={data.market} title="Heatmap Matrix" onSymbol={setSymbol} />}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BarChart3, List, MapPin } from "lucide-react";
 import { useIntelligenceSelection } from "../lib/intelligence/selection-context";
+import { resolveLinkedStrike } from "../lib/intelligence/selection-linking";
 import { buildOpenInterestStudioRead, closestOpenInterestStrike, findOpenInterestRow, openInterestRowsForExpiration, type OpenInterestStudioRow } from "../lib/open-interest-studio/data";
 import type { MarketRead } from "../lib/market/types";
 import { classNames, price } from "./utils";
@@ -51,18 +52,22 @@ export function OpenInterestPanel({ market }: Props) {
   const [view, setView] = useState<View>("profile");
   const [expiration, setExpiration] = useState("");
   const [selectedStrike, setSelectedStrike] = useState<number | null>(null);
-  const { selection, setSelection } = useIntelligenceSelection();
+  const { selection, setSelection, clearSelection } = useIntelligenceSelection();
   const read = useMemo(() => buildOpenInterestStudioRead(market), [market]);
-  const activeExpiration = read?.expirations.includes(expiration) ? expiration : read?.expirations[0] ?? "";
+  const linkedExpiration = selection.symbol === read?.symbol && selection.expiration && read.expirations.includes(selection.expiration) ? selection.expiration : null;
+  const activeExpiration = linkedExpiration ?? (read?.expirations.includes(expiration) ? expiration : read?.expirations[0] ?? "");
   const rows = useMemo(() => read ? openInterestRowsForExpiration(read, activeExpiration) : [], [activeExpiration, read]);
-  const selectedRow = useMemo(() => findOpenInterestRow(rows, selectedStrike) ?? rows[0] ?? null, [rows, selectedStrike]);
+  const linkedStrike = useMemo(() => resolveLinkedStrike(selection, { symbol: read?.symbol, strikes: rows.map((row) => row.strike), expiration: activeExpiration }), [activeExpiration, read?.symbol, rows, selection]);
+  const selectedRow = useMemo(() => findOpenInterestRow(rows, linkedStrike ?? selectedStrike) ?? rows[0] ?? null, [linkedStrike, rows, selectedStrike]);
 
-  useEffect(() => {
-    if (!selectedRow) return;
-    setSelection({ symbol: read?.symbol ?? selection.symbol, strike: selectedRow.strike, expiration: activeExpiration, level: { id: `oi:${activeExpiration}:${selectedRow.strike}`, label: "Open interest strike" } });
-  }, [activeExpiration, read?.symbol, selectedRow, selection.symbol, setSelection]);
-
-  const selectStrike = (strike: number) => setSelectedStrike(strike);
+  const selectStrike = (strike: number) => {
+    setSelectedStrike(strike);
+    setSelection({ symbol: read?.symbol ?? selection.symbol, strike, expiration: activeExpiration, level: { id: `oi:${activeExpiration}:${strike}`, label: "Open interest strike" } });
+  };
+  const clearLocalSelection = () => {
+    setSelectedStrike(null);
+    clearSelection();
+  };
   const unavailable = !read || !rows.length;
 
   return <section className="oiStudio" aria-label="Open Interest Studio">
@@ -76,7 +81,7 @@ export function OpenInterestPanel({ market }: Props) {
         <section className="oiDetails"><span>Details</span><p>Click a real strike to inspect its reported open interest and volume. `N/A` means the provider did not report that field.</p></section>
       </div>
 
-      <aside className="oiInspector" aria-live="polite"><header><span>Selected level</span><h3>{selectedRow ? price(selectedRow.strike) : "Unavailable"}</h3><small>{selectedRow ? distanceFromSpot(selectedRow.strike, read?.spot ?? null) : "Provider-backed strike required"}</small></header>{selectedRow ? <dl><div><dt>Expiration</dt><dd>{selectedRow.expiration}</dd></div><div><dt>Call OI</dt><dd>{contracts(selectedRow.callOpenInterest)}</dd></div><div><dt>Put OI</dt><dd>{contracts(selectedRow.putOpenInterest)}</dd></div><div><dt>Combined OI</dt><dd>{contracts(selectedRow.combinedOpenInterest)}</dd></div><div><dt>Call volume</dt><dd>{contracts(selectedRow.callVolume)}</dd></div><div><dt>Put volume</dt><dd>{contracts(selectedRow.putVolume)}</dd></div><div><dt>Combined volume</dt><dd>{contracts(selectedRow.combinedVolume)}</dd></div></dl> : <div className="oiInspectorEmpty">No provider-backed strike is available to inspect.</div>}</aside>
+      <aside className="oiInspector" aria-live="polite"><header><div className="oiInspectorHeading"><span>Selected level</span>{linkedStrike !== null && <button type="button" className="oiClearSelection" onClick={clearLocalSelection}>Clear</button>}</div><h3>{selectedRow ? price(selectedRow.strike) : "Unavailable"}</h3><small>{selectedRow ? distanceFromSpot(selectedRow.strike, read?.spot ?? null) : "Provider-backed strike required"}</small></header>{selectedRow ? <dl><div><dt>Expiration</dt><dd>{selectedRow.expiration}</dd></div><div><dt>Call OI</dt><dd>{contracts(selectedRow.callOpenInterest)}</dd></div><div><dt>Put OI</dt><dd>{contracts(selectedRow.putOpenInterest)}</dd></div><div><dt>Combined OI</dt><dd>{contracts(selectedRow.combinedOpenInterest)}</dd></div><div><dt>Call volume</dt><dd>{contracts(selectedRow.callVolume)}</dd></div><div><dt>Put volume</dt><dd>{contracts(selectedRow.putVolume)}</dd></div><div><dt>Combined volume</dt><dd>{contracts(selectedRow.combinedVolume)}</dd></div></dl> : <div className="oiInspectorEmpty">No provider-backed strike is available to inspect.</div>}</aside>
     </div>
   </section>;
 }

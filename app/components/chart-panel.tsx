@@ -24,6 +24,8 @@ import type { Candle, CandleRead, MarketRead } from "../lib/market/types";
 import { InteractiveChart } from "./interactive-chart";
 import { Panel } from "./panel";
 import { classNames, price } from "./utils";
+import { useIntelligenceSelection } from "../lib/intelligence/selection-context";
+import { resolveLinkedStrike } from "../lib/intelligence/selection-linking";
 
 type GexMode = "off" | "bubbles" | "levels" | "both";
 
@@ -63,6 +65,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsCloseButtonRef = useRef<HTMLButtonElement>(null);
   const wasSettingsOpenRef = useRef(false);
+  const { selection } = useIntelligenceSelection();
 
   const addDrawing = useCallback((value: number) => setDrawings((current) => [...current, Math.round(value * 100) / 100]), []);
   const toggleFullscreen = useCallback(async () => {
@@ -132,6 +135,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
   const hasGex = Boolean(availableMarket?.exposure?.rows.length);
   const canUndo = drawings.length > 0;
   const activeCandle = selectedCandle ?? candles?.candles.at(-1) ?? null;
+  const selectedStrike = resolveLinkedStrike(selection, { symbol: availableMarket?.symbol, strikes: selection.strike === null ? [] : [selection.strike] });
 
   return <>
   <Panel title={title} onExpand={onExpand} className="chartPanel">
@@ -160,7 +164,7 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
       <div className="chartStage">
         <div className="chartCanvas">
           {showDrawingTools && <div className="drawingToolbar" aria-label="Drawing tools"><button type="button" className={classNames("iconTool", drawMode && "active")} onClick={() => setDrawMode((value) => !value)} aria-label="Draw horizontal line" title="Horizontal line"><PencilLine size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings((current) => current.slice(0, -1))} disabled={!canUndo} aria-label="Undo drawing" title="Undo"><Undo2 size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings([])} disabled={!canUndo} aria-label="Clear drawings" title="Clear"><Trash2 size={16} /></button></div>}
-          {!availableMarket || !candles?.candles.length ? <div className="surfaceEmpty"><strong>Chart data unavailable</strong><span>Sync the market feed to load provider-backed candles.</span></div> : <InteractiveChart market={availableMarket} candles={candles.candles} hasMoreCandles={candles.pagination?.hasMore ?? false} onLoadOlderCandles={onLoadOlderCandles} drawMode={drawMode} drawings={drawings} onAddDrawing={addDrawing} gexMode={gexMode} showLevels={showLevels} showVolume={showVolume} showGrid={showGrid} showCrosshair={showCrosshair} fitNonce={fitNonce} onCrosshairCandle={setSelectedCandle} />}
+          {!availableMarket || !candles?.candles.length ? <div className="surfaceEmpty"><strong>Chart data unavailable</strong><span>Sync the market feed to load provider-backed candles.</span></div> : <InteractiveChart market={availableMarket} candles={candles.candles} hasMoreCandles={candles.pagination?.hasMore ?? false} onLoadOlderCandles={onLoadOlderCandles} drawMode={drawMode} drawings={drawings} onAddDrawing={addDrawing} gexMode={gexMode} showLevels={showLevels} showVolume={showVolume} showGrid={showGrid} showCrosshair={showCrosshair} selectedStrike={selectedStrike} fitNonce={fitNonce} onCrosshairCandle={setSelectedCandle} />}
         </div>
         <aside className="levels"><label>Market levels</label>{levels.map(([name, value, kind]) => <div className={`level ${kind}`} key={name}><i /><div><b>{value === null ? "N/A" : price(value)}</b><small>{name}</small></div></div>)}<p className="levelSource">GEX overlay uses model-calculated chain exposure when available.</p></aside>
       </div>

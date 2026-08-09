@@ -21,6 +21,7 @@ type Props = {
   showVolume: boolean;
   showGrid: boolean;
   showCrosshair: boolean;
+  selectedStrike: number | null;
   fitNonce: number;
   onCrosshairCandle: (candle: Candle | null) => void;
 };
@@ -60,7 +61,7 @@ function sameBubbleLayout(current: Bubble[], next: Bubble[]) {
   });
 }
 
-export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, market, drawMode, drawings, onAddDrawing, gexMode, showLevels, showVolume, showGrid, showCrosshair, fitNonce, onCrosshairCandle }: Props) {
+export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, market, drawMode, drawings, onAddDrawing, gexMode, showLevels, showVolume, showGrid, showCrosshair, selectedStrike, fitNonce, onCrosshairCandle }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<CandleSeries | null>(null);
@@ -68,6 +69,7 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
   const levelLinesRef = useRef<IPriceLine[]>([]);
   const gexLinesRef = useRef<IPriceLine[]>([]);
   const drawingLinesRef = useRef<IPriceLine[]>([]);
+  const selectedLineRef = useRef<IPriceLine | null>(null);
   const previousCandlesRef = useRef<Candle[]>([]);
   const drawModeRef = useRef(drawMode);
   const onAddDrawingRef = useRef(onAddDrawing);
@@ -75,6 +77,7 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
   const latestCandlesRef = useRef(candles);
   const latestMarketRef = useRef(market);
   const latestDrawingsRef = useRef(drawings);
+  const selectedStrikeRef = useRef(selectedStrike);
   const gexModeRef = useRef<GexMode>(gexMode);
   const showLevelsRef = useRef(showLevels);
   const showVolumeRef = useRef(showVolume);
@@ -216,6 +219,15 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
     drawingLinesRef.current = nextDrawings.map((price) => series.createPriceLine({ price, color: CHART_COLORS.drawing, lineWidth: 1, lineStyle: 1 as never, axisLabelVisible: true, title: "User level" }));
   }, [clearLines]);
 
+  const syncSelectedStrike = useCallback((strike: number | null) => {
+    const series = seriesRef.current;
+    if (!series) return;
+    if (selectedLineRef.current) series.removePriceLine(selectedLineRef.current);
+    selectedLineRef.current = null;
+    if (strike === null || !Number.isFinite(strike)) return;
+    selectedLineRef.current = series.createPriceLine({ price: strike, color: CHART_COLORS.selectedReference, lineWidth: 1, lineStyle: 2 as never, axisLabelVisible: true, title: `Selected ${strike.toLocaleString("en-US")}` });
+  }, []);
+
   useEffect(() => { drawModeRef.current = drawMode; }, [drawMode]);
   useEffect(() => { onAddDrawingRef.current = onAddDrawing; }, [onAddDrawing]);
   useEffect(() => { onCrosshairCandleRef.current = onCrosshairCandle; }, [onCrosshairCandle]);
@@ -235,6 +247,10 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
     latestDrawingsRef.current = drawings;
     syncDrawings(drawings);
   }, [drawings, syncDrawings]);
+  useEffect(() => {
+    selectedStrikeRef.current = selectedStrike;
+    syncSelectedStrike(selectedStrike);
+  }, [selectedStrike, syncSelectedStrike]);
   useEffect(() => {
     gexModeRef.current = gexMode;
     syncGexLevels(latestMarketRef.current, gexMode);
@@ -297,6 +313,7 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
       syncMarketLevels(latestMarketRef.current, showLevelsRef.current);
       syncGexLevels(latestMarketRef.current, gexModeRef.current);
       syncDrawings(latestDrawingsRef.current);
+      syncSelectedStrike(selectedStrikeRef.current);
       chart.timeScale().fitContent();
       chart.subscribeClick((param) => {
         if (!drawModeRef.current || !param.point) return;
@@ -342,8 +359,9 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
       levelLinesRef.current = [];
       gexLinesRef.current = [];
       drawingLinesRef.current = [];
+      selectedLineRef.current = null;
     };
-  }, [scheduleBubbleSync, syncCandles, syncDrawings, syncGexLevels, syncMarketLevels]);
+  }, [scheduleBubbleSync, syncCandles, syncDrawings, syncGexLevels, syncMarketLevels, syncSelectedStrike]);
 
   return <div ref={mount} className={drawMode ? "interactiveChart drawMode" : "interactiveChart"} aria-label={`${market.symbol} interactive price chart`}>
     <div className="gexBubbleLayer" aria-label="GEX bubbles">

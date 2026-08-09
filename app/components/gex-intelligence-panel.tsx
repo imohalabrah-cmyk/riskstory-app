@@ -7,6 +7,8 @@ import type { GexLevelAssessment, IntelligenceScore } from "../lib/gex-intellige
 import type { CurveLayer, CurveSide } from "../lib/gex-curve/curve-data";
 import type { ExposureStrike, MarketRead } from "../lib/market/types";
 import { combineReportedValues } from "../lib/market/reported-values";
+import { useIntelligenceSelection } from "../lib/intelligence/selection-context";
+import { resolveLinkedStrike } from "../lib/intelligence/selection-linking";
 import { GexGammaCurve } from "./gex-gamma-curve";
 import { GexGammaHeatmap } from "./gex-gamma-heatmap";
 import { GexGammaHistogram } from "./gex-gamma-histogram";
@@ -143,6 +145,7 @@ export function GexIntelligencePanel({ market }: Props) {
   const [selectedStrike, setSelectedStrike] = useState<number | null>(null);
   const [mapScale, setMapScale] = useState(1);
   const [visualization, setVisualization] = useState<Visualization>("ladder");
+  const { selection, setSelection, clearSelection } = useIntelligenceSelection();
   const availableMarket = market?.provenance.mode !== "unavailable" && market?.exposure?.rows?.length ? market : null;
   const intelligence = useMemo(() => availableMarket ? analyzeGexIntelligence(availableMarket) : null, [availableMarket]);
   const levels = useMemo(() => intelligence?.levels ?? [], [intelligence]);
@@ -155,7 +158,8 @@ export function GexIntelligencePanel({ market }: Props) {
     const score = levelScore(assessmentByStrike.get(row.strike));
     return score !== null && score >= filter;
   }), [assessmentByStrike, exposureRows, filter]);
-  const selectedRow = useMemo(() => exposureRows.find((item) => item.strike === selectedStrike) ?? visibleRows[0] ?? exposureRows[0] ?? null, [exposureRows, selectedStrike, visibleRows]);
+  const linkedStrike = useMemo(() => resolveLinkedStrike(selection, { symbol: availableMarket?.symbol, strikes: exposureRows.map((row) => row.strike) }), [availableMarket?.symbol, exposureRows, selection]);
+  const selectedRow = useMemo(() => exposureRows.find((item) => item.strike === (linkedStrike ?? selectedStrike)) ?? visibleRows[0] ?? exposureRows[0] ?? null, [exposureRows, linkedStrike, selectedStrike, visibleRows]);
   const selectedAssessment = selectedRow ? assessmentByStrike.get(selectedRow.strike) : undefined;
   const maximumValue = useMemo(() => Math.max(...visibleRows.flatMap((item) => {
     const value = displayValue(item, layer, side);
@@ -170,8 +174,18 @@ export function GexIntelligencePanel({ market }: Props) {
 
   const focusSearch = () => {
     if (!nearest) return;
-    setSelectedStrike(nearest.strike);
+    selectStrike(nearest.strike);
     document.getElementById(`gex-level-${nearest.strike}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
+
+  const selectStrike = (strike: number) => {
+    setSelectedStrike(strike);
+    setSelection({ symbol: availableMarket?.symbol ?? selection.symbol, strike, expiration: null, level: { id: `gex:${strike}`, label: "GEX strike" } });
+  };
+
+  const clearLocalSelection = () => {
+    setSelectedStrike(null);
+    clearSelection();
   };
 
   const reset = () => {
@@ -212,7 +226,7 @@ export function GexIntelligencePanel({ market }: Props) {
       <div className="gexStudioCenter">
       <section className="gexMapPanel" aria-label={visualization === "curve" ? "GEX curve" : visualization === "histogram" ? "GEX histogram" : visualization === "heatmap" ? "GEX heatmap" : visualization === "profile" ? "GEX profile" : "GEX map"}>
         <header><div><span>{visualization === "curve" ? "GEX CURVE" : visualization === "histogram" ? "GEX HISTOGRAM" : visualization === "heatmap" ? "GEX HEATMAP" : visualization === "profile" ? "GEX PROFILE" : "GEX MAP"}</span><h3>{layerOptions.find((item) => item.id === layer)?.label} by strike</h3></div><div className="gexMapLegend"><span className="positive">Positive</span><span className="negative">Negative</span><span className="spot">Spot {price(availableMarket.snapshot.spot)}</span></div></header>
-        {visualization === "curve" ? <GexGammaCurve rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : visualization === "histogram" ? <GexGammaHistogram rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : visualization === "heatmap" ? <GexGammaHeatmap rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : visualization === "profile" ? <GexGammaProfile rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : <div className="gexMapCanvas" style={{ "--gex-map-scale": mapScale } as React.CSSProperties}>
+        {visualization === "curve" ? <GexGammaCurve rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={selectStrike} /> : visualization === "histogram" ? <GexGammaHistogram rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={selectStrike} /> : visualization === "heatmap" ? <GexGammaHeatmap rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={selectStrike} /> : visualization === "profile" ? <GexGammaProfile rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={selectStrike} /> : <div className="gexMapCanvas" style={{ "--gex-map-scale": mapScale } as React.CSSProperties}>
           {visibleRows.length ? visibleRows.map((row) => {
             const assessment = assessmentByStrike.get(row.strike);
             const value = displayValue(row, layer, side);
@@ -222,20 +236,20 @@ export function GexIntelligencePanel({ market }: Props) {
             const interval = intervalsByHighStrike.get(row.strike);
             const score = levelScore(assessment);
             const direction = assessment?.direction ?? rawDirection(row.netGex);
-            return <Fragment key={row.strike}><button id={`gex-level-${row.strike}`} type="button" onClick={() => setSelectedStrike(row.strike)} className={classNames("gexMapRow", direction, isSelected && "selected", isSpot && "spotRow")} aria-pressed={isSelected}><span className="gexStrike">{price(row.strike)}</span><span className="gexBarTrack"><i style={{ width: `${width}%` }} /></span><span className="gexMapValue">{value === null ? "N/A" : layer === "openInterest" ? value.toLocaleString() : money(value)}</span><span className={classNames("gexScore", scoreTone(score))}>{score ?? "N/A"}</span>{assessment?.levelIsolation.score !== null && (assessment?.levelIsolation.score ?? 0) >= 70 && <em>Isolated</em>}</button>{interval && <div className="gexLowExposure" title={interval.explanation}><span>Low exposure interval</span><b>{price(interval.lowStrike)} - {price(interval.highStrike)}</b><small>{interval.score}/100</small></div>}</Fragment>;
+            return <Fragment key={row.strike}><button id={`gex-level-${row.strike}`} type="button" onClick={() => selectStrike(row.strike)} className={classNames("gexMapRow", direction, isSelected && "selected", isSpot && "spotRow")} aria-pressed={isSelected}><span className="gexStrike">{price(row.strike)}</span><span className="gexBarTrack"><i style={{ width: `${width}%` }} /></span><span className="gexMapValue">{value === null ? "N/A" : layer === "openInterest" ? value.toLocaleString() : money(value)}</span><span className={classNames("gexScore", scoreTone(score))}>{score ?? "N/A"}</span>{assessment?.levelIsolation.score !== null && (assessment?.levelIsolation.score ?? 0) >= 70 && <em>Isolated</em>}</button>{interval && <div className="gexLowExposure" title={interval.explanation}><span>Low exposure interval</span><b>{price(interval.lowStrike)} - {price(interval.highStrike)}</b><small>{interval.score}/100</small></div>}</Fragment>;
           }) : <div className="gexMapEmpty"><strong>No scored strikes meet the {filter}+ filter</strong><button type="button" onClick={() => setFilter(0)}>Show full provider structure</button></div>}
         </div>}
       </section>
 
     <section className="gexDetailPanel" aria-live="polite">
-       {selectedRow ? <><header><div><span>Selected level</span><h3>{price(selectedRow.strike)}</h3></div><span className={classNames("gexDirection", selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}>{directionLabel(selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}</span></header><div className="gexDetailScores"><div><small>Confluence</small><strong>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</strong></div><div><small>Level strength</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</strong></div><div><small>Isolation</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</strong></div><div><small>Open interest</small><strong>{(() => { const total = combineReportedValues(selectedRow.callOpenInterest, selectedRow.putOpenInterest); return total === null ? "N/A" : total.toLocaleString(); })()}</strong></div><div><small>Net GEX</small><strong className={selectedRow.netGex >= 0 ? "green" : "red"}>{money(selectedRow.netGex)}</strong></div></div><div className="gexExplanation"><h4>Engine context</h4>{selectedAssessment ? <><p>{selectedAssessment.confluence.explanation}</p><ul>{selectedAssessment.confluence.inputs.map((item) => <li key={item}>{item}</li>)}</ul></> : <p>This provider-backed strike is displayed in the full exposure structure. It is not in the engine&apos;s ranked score set, so no intelligence score is inferred.</p>}</div></> : <div className="surfaceEmpty"><strong>No level selected</strong><span>Select a visible provider-backed strike to inspect its available context.</span></div>}
+       {selectedRow ? <><header><div><span>Selected level</span><h3>{price(selectedRow.strike)}</h3></div><div className="gexDetailActions"><span className={classNames("gexDirection", selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}>{directionLabel(selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}</span>{linkedStrike !== null && <button type="button" className="gexClearSelection" onClick={clearLocalSelection}>Clear</button>}</div></header><div className="gexDetailScores"><div><small>Confluence</small><strong>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</strong></div><div><small>Level strength</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</strong></div><div><small>Isolation</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</strong></div><div><small>Open interest</small><strong>{(() => { const total = combineReportedValues(selectedRow.callOpenInterest, selectedRow.putOpenInterest); return total === null ? "N/A" : total.toLocaleString(); })()}</strong></div><div><small>Net GEX</small><strong className={selectedRow.netGex >= 0 ? "green" : "red"}>{money(selectedRow.netGex)}</strong></div></div><div className="gexExplanation"><h4>Engine context</h4>{selectedAssessment ? <><p>{selectedAssessment.confluence.explanation}</p><ul>{selectedAssessment.confluence.inputs.map((item) => <li key={item}>{item}</li>)}</ul></> : <p>This provider-backed strike is displayed in the full exposure structure. It is not in the engine&apos;s ranked score set, so no intelligence score is inferred.</p>}</div></> : <div className="surfaceEmpty"><strong>No level selected</strong><span>Select a visible provider-backed strike to inspect its available context.</span></div>}
     </section>
       </div>
 
       <aside className="gexSidePanel" aria-label="GEX intelligence details">
         <section className="gexAnalysisSummary" aria-live="polite"><span>Analysis</span><strong>Current view: {visualization === "curve" ? "Curve" : visualization === "histogram" ? "Histogram" : visualization === "heatmap" ? "Heatmap" : visualization === "profile" ? "Profile" : "Ladder"}</strong><p>{selectedAssessment?.confluence.explanation ?? "Select a provider-backed strike to inspect its available analysis."}</p><dl><div><dt>Confluence</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</dd></div><div><dt>Level strength</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</dd></div><div><dt>Isolation</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</dd></div></dl></section>
         <section className="gexClarityCard"><span>Market clarity</span><strong>{scoreText(intelligence.marketClarity)}</strong><b>{intelligence.marketClarity.direction}</b><p>{intelligence.marketClarity.explanation}</p></section>
-        <section className="gexStrongest"><header><div><Sparkles size={15} /><span>Strongest levels</span></div><small>Top {Math.min(5, levels.length)}</small></header>{levels.slice(0, 5).map((level) => <button type="button" key={level.strike} className={classNames(selectedRow?.strike === level.strike && "selected")} onClick={() => setSelectedStrike(level.strike)}><b>{price(level.strike)}</b><span>{levelScore(level)}</span><small>{directionLabel(level.direction)}</small></button>)}</section>
+        <section className="gexStrongest"><header><div><Sparkles size={15} /><span>Strongest levels</span></div><small>Top {Math.min(5, levels.length)}</small></header>{levels.slice(0, 5).map((level) => <button type="button" key={level.strike} className={classNames(selectedRow?.strike === level.strike && "selected")} onClick={() => selectStrike(level.strike)}><b>{price(level.strike)}</b><span>{levelScore(level)}</span><small>{directionLabel(level.direction)}</small></button>)}</section>
       </aside>
     </div>
       </div>

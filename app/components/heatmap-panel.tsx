@@ -4,6 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import { Minus, Plus, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
 import type { ExposureStrike, MarketRead } from "../lib/market/types";
 import { combineReportedValues } from "../lib/market/reported-values";
+import { useIntelligenceSelection } from "../lib/intelligence/selection-context";
+import { resolveLinkedStrike, selectionMatchesSymbol } from "../lib/intelligence/selection-linking";
 import { Panel } from "./panel";
 import { classNames, price } from "./utils";
 
@@ -27,6 +29,7 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
   const [hovered, setHovered] = useState<{ strike: number; expiration: string; value: number } | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const { selection } = useIntelligenceSelection();
   const available = market?.provenance.mode !== "unavailable" ? market : null;
   const expirations = useMemo(() => (available?.exposure?.expirations ?? []).filter((item) => expiry === "all" || item.expiration === expiry), [available, expiry]);
   const rows = useMemo(() => {
@@ -48,6 +51,8 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
     const requested = Number(query);
     return query && Number.isFinite(requested) && rows.length === 1 && Math.abs(rows[0].strike - requested) >= .01 ? rows[0].strike : null;
   }, [query, rows]);
+  const linkedStrike = useMemo(() => resolveLinkedStrike(selection, { symbol: available?.symbol, strikes: rows.map((row) => row.strike) }), [available?.symbol, rows, selection]);
+  const hasMatchingLinkedSymbol = selectionMatchesSymbol(selection, available?.symbol);
   const rowHeight = Math.round(ROW_HEIGHT * density);
   const columnWidth = Math.round(122 * density);
   const strikeWidth = Math.round(96 * density);
@@ -66,7 +71,8 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
     const max = scaleMode === "global" ? globalMax : expirationMax.get(item.expiration) ?? 1;
     const intensity = value === null ? .025 : Math.max(.025, Math.min(1, value / max));
     const active = hovered?.strike === row.strike && hovered.expiration === item.expiration;
-    return <button key={item.expiration} type="button" className={classNames("heatCell", side, active && "hovered")} style={{ "--heat-intensity": intensity } as React.CSSProperties} onMouseEnter={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onFocus={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onMouseLeave={() => setHovered(null)} aria-label={`${item.expiration}, strike ${price(row.strike)}, ${readableOi(value)} open interest`}><span>{readableOi(value)}</span></button>;
+    const linked = linkedStrike === row.strike && (selection.expiration === null || selection.expiration === item.expiration);
+    return <button key={item.expiration} type="button" className={classNames("heatCell", side, active && "hovered", linked && "selected")} style={{ "--heat-intensity": intensity } as React.CSSProperties} onMouseEnter={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onFocus={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onMouseLeave={() => setHovered(null)} aria-label={`${item.expiration}, strike ${price(row.strike)}, ${readableOi(value)} open interest`}><span>{readableOi(value)}</span></button>;
   };
 
   return <Panel title={title} onExpand={onExpand} className={classNames("heatPanel", "heatmapIntelligence", compact && "heatCompact")}>
@@ -85,7 +91,7 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
         <div className="heatMatrix" style={{ "--heat-columns": expirations.length, "--heat-row-height": `${rowHeight}px`, "--heat-strike-width": `${strikeWidth}px`, "--heat-column-width": `${columnWidth}px`, "--heat-width": `${strikeWidth + expirations.length * columnWidth}px` } as React.CSSProperties}>
           <div className="heatHeader"><div>Strike</div>{expirations.map((item) => <div key={item.expiration}>{item.expiration}</div>)}</div>
           <div className="heatSpacer" style={{ height: `${start * rowHeight}px` }} />
-          {visibleRows.map((row) => <div key={row.strike} className={classNames("heatRow", Math.abs(row.strike - available.snapshot.spot) < .01 && "spotRow")}><strong>{price(row.strike)}</strong>{expirations.map((item) => cell(row, item))}</div>)}
+          {visibleRows.map((row) => <div key={row.strike} className={classNames("heatRow", Math.abs(row.strike - available.snapshot.spot) < .01 && "spotRow", hasMatchingLinkedSymbol && linkedStrike === row.strike && "selectedRow")}><strong>{price(row.strike)}</strong>{expirations.map((item) => cell(row, item))}</div>)}
           <div className="heatSpacer" style={{ height: `${Math.max(0, rows.length - end) * rowHeight}px` }} />
         </div>
       </div>

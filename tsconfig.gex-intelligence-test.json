@@ -11,7 +11,9 @@
   },
   "include": [
     "tests/gex-intelligence.test.ts",
+    "tests/gex-curve.test.ts",
     "app/lib/gex-intelligence/**/*.ts",
+    "app/lib/gex-curve/**/*.ts",
     "app/lib/market/types.ts"
   ]
 }

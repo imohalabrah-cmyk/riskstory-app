@@ -12,6 +12,20 @@ export type GexProfileRow = GexCurvePoint & {
   totalOpenInterest: number | null;
 };
 
+export type GexHeatmapCell = {
+  id: "callGex" | "putGex" | "grossGex" | "netGex" | "callOpenInterest" | "putOpenInterest" | "combinedOpenInterest";
+  label: string;
+  value: number | null;
+  unit: "gex" | "contracts";
+  signed: boolean;
+};
+
+export type GexHeatmapRow = {
+  strike: number;
+  totalOpenInterest: number | null;
+  cells: GexHeatmapCell[];
+};
+
 export type GexCurveMeasure = {
   label: string;
   unit: "gex" | "contracts";
@@ -67,5 +81,43 @@ export function buildGexProfileRows(rows: ExposureStrike[], layer: CurveLayer, s
       };
     })
     .filter((row) => Number.isFinite(row.strike) && row.strike > 0 && Number.isFinite(row.value))
+    .sort((left, right) => right.strike - left.strike);
+}
+
+type HeatmapColumnDefinition = Omit<GexHeatmapCell, "value"> & { value: (row: ExposureStrike) => number };
+
+function heatmapColumns(layer: CurveLayer): HeatmapColumnDefinition[] {
+  if (layer === "netGex") {
+    return [{ id: "netGex", label: "Net GEX", unit: "gex", signed: true, value: (row) => row.netGex }];
+  }
+
+  if (layer === "openInterest") {
+    return [
+      { id: "callOpenInterest", label: "Call OI", unit: "contracts", signed: false, value: (row) => row.callOpenInterest },
+      { id: "putOpenInterest", label: "Put OI", unit: "contracts", signed: false, value: (row) => row.putOpenInterest },
+      { id: "combinedOpenInterest", label: "Combined OI", unit: "contracts", signed: false, value: (row) => row.callOpenInterest + row.putOpenInterest },
+    ];
+  }
+
+  return [
+    { id: "callGex", label: "Call GEX", unit: "gex", signed: true, value: (row) => row.callGex },
+    { id: "putGex", label: "Put GEX", unit: "gex", signed: true, value: (row) => row.putGex },
+    { id: "grossGex", label: "Gross GEX", unit: "gex", signed: false, value: (row) => Math.abs(row.callGex) + Math.abs(row.putGex) },
+  ];
+}
+
+export function buildGexHeatmapRows(rows: ExposureStrike[], layer: CurveLayer): GexHeatmapRow[] {
+  const columns = heatmapColumns(layer);
+  return rows
+    .filter((row) => Number.isFinite(row.strike) && row.strike > 0)
+    .map((row) => {
+      const totalOpenInterest = row.callOpenInterest + row.putOpenInterest;
+      const cells = columns.map((column) => {
+        const value = column.value(row);
+        return { id: column.id, label: column.label, unit: column.unit, signed: column.signed, value: Number.isFinite(value) ? value : null };
+      });
+      return { strike: row.strike, totalOpenInterest: Number.isFinite(totalOpenInterest) ? totalOpenInterest : null, cells };
+    })
+    .filter((row) => row.cells.some((cell) => cell.value !== null))
     .sort((left, right) => right.strike - left.strike);
 }

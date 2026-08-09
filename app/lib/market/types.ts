@@ -57,10 +57,10 @@ export type MarketLevel = {
 
 export type ExposureStrike = {
   strike: number;
-  callOpenInterest: number;
-  putOpenInterest: number;
-  callVolume: number;
-  putVolume: number;
+  callOpenInterest: number | null;
+  putOpenInterest: number | null;
+  callVolume: number | null;
+  putVolume: number | null;
   callGex: number;
   putGex: number;
   netGex: number;

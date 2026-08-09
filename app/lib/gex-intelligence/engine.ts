@@ -14,7 +14,7 @@ const ISOLATION_WINDOW = 2;
 const STRONG_LEVEL_SCORE = 70;
 const WEAK_LEVEL_SCORE = 45;
 
-type UsableStrike = ExposureStrike & { totalOpenInterest: number; magnitude: number };
+type UsableStrike = Omit<ExposureStrike, "callOpenInterest" | "putOpenInterest"> & { callOpenInterest: number; putOpenInterest: number; totalOpenInterest: number; magnitude: number };
 type StrengthRow = { row: UsableStrike; strength: IntelligenceScore };
 
 function clamp(value: number, minimum = 0, maximum = 100) {
@@ -37,12 +37,12 @@ function direction(value: number, tolerance = 0): GexDirection {
 
 function usableRows(market: MarketRead): UsableStrike[] {
   return (market.exposure?.rows || [])
-    .filter((row) => Number.isFinite(row.strike) && Number.isFinite(row.netGex) && row.strike > 0)
-    .map((row) => ({
-      ...row,
-      totalOpenInterest: Math.max(0, row.callOpenInterest) + Math.max(0, row.putOpenInterest),
-      magnitude: Math.abs(row.netGex),
-    }))
+    .flatMap((row) => {
+      const callOpenInterest = row.callOpenInterest;
+      const putOpenInterest = row.putOpenInterest;
+      if (!Number.isFinite(row.strike) || !Number.isFinite(row.netGex) || row.strike <= 0 || typeof callOpenInterest !== "number" || typeof putOpenInterest !== "number") return [];
+      return [{ ...row, callOpenInterest, putOpenInterest, totalOpenInterest: Math.max(0, callOpenInterest) + Math.max(0, putOpenInterest), magnitude: Math.abs(row.netGex) }];
+    })
     .filter((row) => row.magnitude > 0)
     .sort((left, right) => left.strike - right.strike);
 }

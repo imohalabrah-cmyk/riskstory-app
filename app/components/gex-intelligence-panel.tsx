@@ -6,6 +6,7 @@ import { analyzeGexIntelligence } from "../lib/gex-intelligence";
 import type { GexLevelAssessment, IntelligenceScore } from "../lib/gex-intelligence";
 import type { CurveLayer, CurveSide } from "../lib/gex-curve/curve-data";
 import type { ExposureStrike, MarketRead } from "../lib/market/types";
+import { combineReportedValues } from "../lib/market/reported-values";
 import { GexGammaCurve } from "./gex-gamma-curve";
 import { GexGammaHeatmap } from "./gex-gamma-heatmap";
 import { GexGammaHistogram } from "./gex-gamma-histogram";
@@ -71,11 +72,11 @@ function rawDirection(value: number): GexLevelAssessment["direction"] {
   return "balanced";
 }
 
-function displayValue(row: ExposureStrike, layer: Layer, side: Side) {
+function displayValue(row: ExposureStrike, layer: Layer, side: Side): number | null {
   if (layer === "openInterest") {
     if (side === "calls") return row.callOpenInterest;
     if (side === "puts") return row.putOpenInterest;
-    return row.callOpenInterest + row.putOpenInterest;
+    return combineReportedValues(row.callOpenInterest, row.putOpenInterest);
   }
   if (layer === "netGex") return row.netGex;
   if (side === "calls") return row.callGex;
@@ -156,7 +157,10 @@ export function GexIntelligencePanel({ market }: Props) {
   }), [assessmentByStrike, exposureRows, filter]);
   const selectedRow = useMemo(() => exposureRows.find((item) => item.strike === selectedStrike) ?? visibleRows[0] ?? exposureRows[0] ?? null, [exposureRows, selectedStrike, visibleRows]);
   const selectedAssessment = selectedRow ? assessmentByStrike.get(selectedRow.strike) : undefined;
-  const maximumValue = useMemo(() => Math.max(...visibleRows.map((item) => Math.abs(displayValue(item, layer, side))), 1), [layer, side, visibleRows]);
+  const maximumValue = useMemo(() => Math.max(...visibleRows.flatMap((item) => {
+    const value = displayValue(item, layer, side);
+    return typeof value === "number" ? [Math.abs(value)] : [];
+  }), 1), [layer, side, visibleRows]);
   const nearest = useMemo(() => {
     const requested = Number(search);
     if (!Number.isFinite(requested) || !exposureRows.length) return null;
@@ -218,13 +222,13 @@ export function GexIntelligencePanel({ market }: Props) {
             const interval = intervalsByHighStrike.get(row.strike);
             const score = levelScore(assessment);
             const direction = assessment?.direction ?? rawDirection(row.netGex);
-            return <Fragment key={row.strike}><button id={`gex-level-${row.strike}`} type="button" onClick={() => setSelectedStrike(row.strike)} className={classNames("gexMapRow", direction, isSelected && "selected", isSpot && "spotRow")} aria-pressed={isSelected}><span className="gexStrike">{price(row.strike)}</span><span className="gexBarTrack"><i style={{ width: `${width}%` }} /></span><span className="gexMapValue">{layer === "openInterest" ? value.toLocaleString() : money(value)}</span><span className={classNames("gexScore", scoreTone(score))}>{score ?? "N/A"}</span>{assessment?.levelIsolation.score !== null && (assessment?.levelIsolation.score ?? 0) >= 70 && <em>Isolated</em>}</button>{interval && <div className="gexLowExposure" title={interval.explanation}><span>Low exposure interval</span><b>{price(interval.lowStrike)} - {price(interval.highStrike)}</b><small>{interval.score}/100</small></div>}</Fragment>;
+            return <Fragment key={row.strike}><button id={`gex-level-${row.strike}`} type="button" onClick={() => setSelectedStrike(row.strike)} className={classNames("gexMapRow", direction, isSelected && "selected", isSpot && "spotRow")} aria-pressed={isSelected}><span className="gexStrike">{price(row.strike)}</span><span className="gexBarTrack"><i style={{ width: `${width}%` }} /></span><span className="gexMapValue">{value === null ? "N/A" : layer === "openInterest" ? value.toLocaleString() : money(value)}</span><span className={classNames("gexScore", scoreTone(score))}>{score ?? "N/A"}</span>{assessment?.levelIsolation.score !== null && (assessment?.levelIsolation.score ?? 0) >= 70 && <em>Isolated</em>}</button>{interval && <div className="gexLowExposure" title={interval.explanation}><span>Low exposure interval</span><b>{price(interval.lowStrike)} - {price(interval.highStrike)}</b><small>{interval.score}/100</small></div>}</Fragment>;
           }) : <div className="gexMapEmpty"><strong>No scored strikes meet the {filter}+ filter</strong><button type="button" onClick={() => setFilter(0)}>Show full provider structure</button></div>}
         </div>}
       </section>
 
     <section className="gexDetailPanel" aria-live="polite">
-      {selectedRow ? <><header><div><span>Selected level</span><h3>{price(selectedRow.strike)}</h3></div><span className={classNames("gexDirection", selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}>{directionLabel(selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}</span></header><div className="gexDetailScores"><div><small>Confluence</small><strong>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</strong></div><div><small>Level strength</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</strong></div><div><small>Isolation</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</strong></div><div><small>Open interest</small><strong>{(selectedRow.callOpenInterest + selectedRow.putOpenInterest).toLocaleString()}</strong></div><div><small>Net GEX</small><strong className={selectedRow.netGex >= 0 ? "green" : "red"}>{money(selectedRow.netGex)}</strong></div></div><div className="gexExplanation"><h4>Engine context</h4>{selectedAssessment ? <><p>{selectedAssessment.confluence.explanation}</p><ul>{selectedAssessment.confluence.inputs.map((item) => <li key={item}>{item}</li>)}</ul></> : <p>This provider-backed strike is displayed in the full exposure structure. It is not in the engine&apos;s ranked score set, so no intelligence score is inferred.</p>}</div></> : <div className="surfaceEmpty"><strong>No level selected</strong><span>Select a visible provider-backed strike to inspect its available context.</span></div>}
+       {selectedRow ? <><header><div><span>Selected level</span><h3>{price(selectedRow.strike)}</h3></div><span className={classNames("gexDirection", selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}>{directionLabel(selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}</span></header><div className="gexDetailScores"><div><small>Confluence</small><strong>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</strong></div><div><small>Level strength</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</strong></div><div><small>Isolation</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</strong></div><div><small>Open interest</small><strong>{(() => { const total = combineReportedValues(selectedRow.callOpenInterest, selectedRow.putOpenInterest); return total === null ? "N/A" : total.toLocaleString(); })()}</strong></div><div><small>Net GEX</small><strong className={selectedRow.netGex >= 0 ? "green" : "red"}>{money(selectedRow.netGex)}</strong></div></div><div className="gexExplanation"><h4>Engine context</h4>{selectedAssessment ? <><p>{selectedAssessment.confluence.explanation}</p><ul>{selectedAssessment.confluence.inputs.map((item) => <li key={item}>{item}</li>)}</ul></> : <p>This provider-backed strike is displayed in the full exposure structure. It is not in the engine&apos;s ranked score set, so no intelligence score is inferred.</p>}</div></> : <div className="surfaceEmpty"><strong>No level selected</strong><span>Select a visible provider-backed strike to inspect its available context.</span></div>}
     </section>
       </div>
 

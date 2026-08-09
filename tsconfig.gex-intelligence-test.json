@@ -12,8 +12,10 @@
   "include": [
     "tests/gex-intelligence.test.ts",
     "tests/gex-curve.test.ts",
+    "tests/oi-data-semantics.test.ts",
     "app/lib/gex-intelligence/**/*.ts",
     "app/lib/gex-curve/**/*.ts",
-    "app/lib/market/types.ts"
+    "app/lib/market/types.ts",
+    "app/lib/market/reported-values.ts"
   ]
 }

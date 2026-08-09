@@ -5,6 +5,7 @@ import type { ViewId } from "./types";
 
 const titles: Record<ViewId, [string, string]> = {
   command: ["Command Center", "Unified market intelligence across gamma, flow, heatmap, and Trinity."],
+  marketStory: ["Market Story", "Attention first: the current exposure structure that deserves a closer look."],
   gamma: ["Gamma Center", "Gamma structure, positioning levels, expiry profiles, and regime signals."],
   gex: ["GEX Intelligence", "Provider-backed GEX structure, scored levels, and exposure context."],
   heatmap: ["Heatmap Matrix", "Expiration-by-strike pressure with institutional GEX context."],

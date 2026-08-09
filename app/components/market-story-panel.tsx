@@ -72,15 +72,17 @@ function SkeletonLine({ short = false }: { short?: boolean }) {
 
 function StoryUnavailable({ onNavigate }: Pick<Props, "onNavigate">) {
   return <section className="marketStory marketStoryUnavailable" aria-label="Market Story awaiting provider data">
-    <header className="storyIntro">
-      <div><span>MARKET STORY</span><h2>Today&apos;s focus</h2><p>Where should attention go today, and why?</p></div>
-      <div className="storyAvailability"><CircleAlert size={15} /><span>Provider data unavailable</span></div>
-    </header>
-    <div className="storyNotice"><Info size={15} /><span>The workspace is ready. Focus items and evidence appear only after a supported provider-backed exposure read is available.</span></div>
+    <section className="storyHero">
+      <header className="storyIntro">
+        <div><span>MARKET STORY</span><h2>Today&apos;s focus</h2><p>Where should attention go today, and why?</p></div>
+        <div className="storyAvailability"><CircleAlert size={15} /><span>Provider data unavailable</span></div>
+      </header>
+      <div className="storyNotice"><Info size={15} /><span>The workspace is ready. Focus items and evidence appear only after a supported provider-backed exposure read is available.</span></div>
 
-    <section className="storyFocus storySkeletonFocus" aria-busy="true">
-      <header><div><span>01</span><div><small>Today&apos;s Focus</small><h3>Attention first</h3></div></div><p>Awaiting provider-backed exposure</p></header>
-      <div className="storyFocusGrid">{Array.from({ length: 3 }, (_, index) => <article key={index}><SkeletonLine short /><SkeletonLine /><SkeletonLine short /></article>)}</div>
+      <section className="storyFocus storySkeletonFocus" aria-busy="true">
+        <header><div><span>01</span><div><small>Today&apos;s Focus</small><h3>Attention first</h3></div></div><p>Awaiting provider-backed exposure</p></header>
+        <div className="storyFocusGrid">{Array.from({ length: 3 }, (_, index) => <article key={index}><SkeletonLine short /><SkeletonLine /><SkeletonLine short /></article>)}</div>
+      </section>
     </section>
 
     <section className="storyEvidence storyUnavailableGrid" aria-busy="true">
@@ -125,14 +127,16 @@ export function MarketStoryPanel({ market, onNavigate }: Props) {
   ];
 
   return <section className="marketStory" aria-label="Market Story">
-    <header className="storyIntro">
-      <div><span>MARKET STORY</span><h2>Today&apos;s focus</h2><p>Where should attention go today, and why?</p></div>
-      <div className="storySymbol"><Compass size={16} /><b>{availableMarket.symbol}</b><small>{availableMarket.provenance.label}</small></div>
-    </header>
+    <section className="storyHero">
+      <header className="storyIntro">
+        <div><span>MARKET STORY</span><h2>Today&apos;s focus</h2><p>Where should attention go today, and why?</p></div>
+        <div className="storySymbol"><Compass size={16} /><b>{availableMarket.symbol}</b><small>{availableMarket.provenance.label}</small></div>
+      </header>
 
-    <section className="storyFocus" aria-label="Today's Focus">
-      <header><div><span>01</span><div><small>Today&apos;s Focus</small><h3>Start here</h3></div></div><p>Up to three current engine-ranked focus items.</p></header>
-      <div className="storyFocusGrid">{focus.map((item, index) => <button type="button" key={item.id} className={classNames(selected?.id === item.id && "selected")} onClick={() => setSelectedId(item.id)} aria-pressed={selected?.id === item.id}><span className="storyFocusIndex">0{index + 1}</span><small>{item.label}</small><strong>{focusRange(item)}</strong><p>{item.kind === "level" ? item.level.direction === "positive" ? "Positive exposure" : item.level.direction === "negative" ? "Negative exposure" : "Balanced exposure" : item.interval.location.replace("_", " ")}</p>{item.score !== null && <em>{item.score}/100</em>}</button>)}</div>
+      <section className="storyFocus" aria-label="Today's Focus">
+        <header><div><span>01</span><div><small>Today&apos;s Focus</small><h3>Start here</h3></div></div><p>Up to three current engine-ranked focus items.</p></header>
+        <div className="storyFocusGrid">{focus.map((item, index) => <button type="button" key={item.id} className={classNames(selected?.id === item.id && "selected")} onClick={() => setSelectedId(item.id)} aria-pressed={selected?.id === item.id}><span className="storyFocusIndex">0{index + 1}</span><small>{item.label}</small><strong>{focusRange(item)}</strong><p>{item.kind === "level" ? item.level.direction === "positive" ? "Positive exposure" : item.level.direction === "negative" ? "Negative exposure" : "Balanced exposure" : item.interval.location.replace("_", " ")}</p>{item.score !== null && <em>{item.score}/100</em>}</button>)}</div>
+      </section>
     </section>
 
     <section className="storyEvidence">

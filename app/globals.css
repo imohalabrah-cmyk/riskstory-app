@@ -182,3 +182,42 @@ button { -webkit-tap-highlight-color: transparent; }
 .storySkeletonFocus .storyFocusGrid > article { cursor: default; }.storySkeletonLine { display: block; width: 82%; height: 10px; border-radius: 999px; background: rgba(151, 170, 198, .13); }.storySkeletonLine.short { width: 45%; }.storyUnavailableGrid { grid-template-columns: minmax(0, 1.15fr) minmax(360px, .85fr); }.storyPlaceholder, .storyContextSkeleton { display: grid; align-content: center; gap: 14px; min-height: 147px; padding: 18px; }.storyContextSkeleton { grid-template-columns: repeat(2, minmax(0, 1fr)); }.storyContextSkeleton .storySkeletonLine { width: 78%; }.storySkeletonLevels > div { min-height: 72px; display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 12px; padding: 0 16px; border-top: 1px solid var(--rs-line-soft); }.marketStoryUnavailable .storyFocusGrid > article { min-height: 140px; }.marketStoryUnavailable .storyLevels > header > p { max-width: 280px; }.marketStoryUnavailable .storyExplore { opacity: .94; }
 @media (max-width: 980px) { .storyEvidence, .storyUnavailableGrid { grid-template-columns: 1fr; }.storyLevelRows { grid-template-columns: repeat(3, minmax(0, 1fr)); }.storyLevelRows button:nth-child(3n) { border-right: 0; }.storyLevelRows button:nth-child(n + 4) { border-top: 1px solid var(--rs-line-soft); } }
 @media (max-width: 680px) { .storyIntro { align-items: stretch; flex-direction: column; padding: 16px; }.storySymbol, .storyAvailability { width: fit-content; }.storyFocus > header, .storyLevels > header { align-items: start; flex-direction: column; }.storyFocus > header > p, .storyLevels > header > p { text-align: left; }.storyFocusGrid { grid-template-columns: 1fr; }.storyFocusGrid > button, .storyFocusGrid > article { min-height: 118px; border-right: 0; border-bottom: 1px solid var(--rs-line-soft); }.storyFocusGrid > button:last-child, .storyFocusGrid > article:last-child { border-bottom: 0; }.storyContext > div { grid-template-columns: 1fr; }.storyContext section, .storyContext section:nth-child(2n) { border-right: 0; }.storyContext section:nth-last-child(-n + 2) { border-bottom: 1px solid var(--rs-line-soft); }.storyContext section:last-child { border-bottom: 0; }.storyLevelRows { grid-template-columns: 1fr; }.storyLevelRows button, .storyLevelRows button:nth-child(3n) { min-height: 80px; grid-template-columns: 30px 85px 1fr auto auto; align-items: center; gap: 7px; border-right: 0; border-bottom: 1px solid var(--rs-line-soft); }.storyLevelRows button:last-child { border-bottom: 0; }.storyLevelRows button:nth-child(n + 4) { border-top: 0; }.storyExplore { align-items: stretch; flex-direction: column; }.storyExplore > div { display: grid; grid-template-columns: 1fr; }.storyExplore button { width: 100%; }.storyUnavailableGrid { display: grid; }.storyContextSkeleton { grid-template-columns: 1fr; }.storySkeletonLevels > div { grid-template-columns: 72px 1fr 45px; } }
+
+/* Market Story hierarchy: attention first, then explanation, then evidence. */
+.marketStory { width: 100%; max-width: 1680px; gap: 18px; }
+.storyFocus { min-height: min(46vh, 480px); }
+.storyFocusGrid { min-height: clamp(250px, 34vh, 360px); grid-template-columns: minmax(0, 1.5fr) minmax(260px, .75fr); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.storyFocusGrid > button:first-child, .storyFocusGrid > article:first-child { grid-row: 1 / span 2; min-height: 0; padding: clamp(22px, 2.6vw, 40px); }
+.storyFocusGrid > button:not(:first-child), .storyFocusGrid > article:not(:first-child) { min-height: 0; padding: clamp(18px, 1.8vw, 26px); border-right: 0; }
+.storyFocusGrid > button:nth-child(2), .storyFocusGrid > article:nth-child(2) { border-right: 0; border-bottom: 1px solid var(--rs-line-soft); }
+.storyFocusGrid > button:nth-child(3), .storyFocusGrid > article:nth-child(3) { border-bottom: 1px solid var(--rs-line-soft); }
+.storyFocusGrid > button:first-child .storyFocusIndex { font-size: 12px; }
+.storyFocusGrid > button:first-child strong { font-size: clamp(34px, 4vw, 60px); line-height: 1; }
+.storyFocusGrid > button:first-child p { max-width: 26ch; font-size: 12px; }
+.storyFocusGrid > button:first-child em { right: clamp(20px, 2.3vw, 34px); bottom: clamp(20px, 2.3vw, 34px); }
+.storyEvidence, .storyUnavailableGrid { grid-template-columns: minmax(0, 1.55fr) minmax(300px, .7fr); gap: 18px; }
+.storyWhy { min-height: 220px; }
+.storyWhy > p { max-width: 72ch; padding: clamp(20px, 2vw, 28px) clamp(20px, 2vw, 28px) 8px; font-size: 14px; }
+.storyWhy ul { padding: 12px clamp(20px, 2vw, 28px) clamp(20px, 2vw, 28px); }
+.storyContext { min-height: 220px; }
+.storyLevels > header { padding-block: 12px; }
+.storyLevelRows button { min-height: 86px; }
+.storyExplore { min-height: 72px; }
+@media (max-width: 1120px) { .storyFocusGrid { grid-template-columns: minmax(0, 1.25fr) minmax(210px, .75fr); }.storyEvidence, .storyUnavailableGrid { grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); } }
+@media (max-width: 980px) { .storyEvidence, .storyUnavailableGrid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .marketStory { gap: 12px; }.storyFocus { min-height: 0; }.storyFocusGrid { min-height: 0; grid-template-columns: 1fr; grid-template-rows: none; }.storyFocusGrid > button:first-child, .storyFocusGrid > article:first-child { grid-row: auto; min-height: 190px; padding: 24px; }.storyFocusGrid > button:not(:first-child), .storyFocusGrid > article:not(:first-child) { min-height: 110px; padding: 18px; border-bottom: 1px solid var(--rs-line-soft); }.storyFocusGrid > button:first-child strong { font-size: 38px; }.storyEvidence, .storyUnavailableGrid { grid-template-columns: 1fr; gap: 12px; }.storyWhy, .storyContext { min-height: 0; } }
+
+/* Market Story final hierarchy: one hero surface, then explanation, then context. */
+.storyHero { min-height: min(68vh, 620px); display: flex; flex-direction: column; border: 1px solid var(--rs-line); border-radius: var(--rs-radius); background: linear-gradient(180deg, rgba(17, 28, 45, .92), rgba(8, 14, 24, .92)); overflow: hidden; }
+.storyHero .storyIntro { flex: 0 0 auto; padding: clamp(22px, 2.3vw, 34px); border: 0; border-radius: 0; background: transparent; }
+.storyHero .storyNotice { margin: 0 clamp(16px, 2vw, 28px); border-radius: var(--rs-radius-sm); }
+.storyHero .storyFocus { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin-top: clamp(16px, 2vw, 28px); border: 0; border-top: 1px solid var(--rs-line-soft); border-radius: 0; background: transparent; }
+.storyHero .storyFocusGrid { flex: 1 1 auto; min-height: clamp(280px, 38vh, 430px); }
+.storyHero .storyFocus > header { padding-inline: clamp(20px, 2.3vw, 34px); }
+.storyEvidence, .storyUnavailableGrid { grid-template-columns: minmax(0, 1.9fr) minmax(260px, .55fr); }
+.storyWhy { min-height: 240px; }
+.storyContext { min-height: 180px; }
+.storyContext section { min-height: 74px; padding: 11px 13px; }
+.storyContext strong { font-size: 17px; }
+@media (max-width: 980px) { .storyHero { min-height: 0; }.storyHero .storyFocusGrid { min-height: 300px; }.storyEvidence, .storyUnavailableGrid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .storyHero .storyIntro { padding: 20px; }.storyHero .storyNotice { margin-inline: 14px; }.storyHero .storyFocus { margin-top: 16px; }.storyHero .storyFocusGrid { min-height: 0; }.storyEvidence, .storyUnavailableGrid { grid-template-columns: 1fr; } }

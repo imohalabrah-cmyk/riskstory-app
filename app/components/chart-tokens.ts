@@ -13,6 +13,7 @@ export const CHART_COLORS = {
   zeroGamma: "#d6ae4b",
   spot: "#c3cedd",
   drawing: "#35c3e7",
+  selectedReference: "rgba(124, 190, 255, .78)",
   gexPositive: "#4aa4f5",
   gexStrong: "#35c6bb",
   gexNegative: "#e97882",

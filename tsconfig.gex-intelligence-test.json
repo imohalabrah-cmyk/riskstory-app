@@ -14,9 +14,11 @@
     "tests/gex-curve.test.ts",
     "tests/oi-data-semantics.test.ts",
     "tests/open-interest-studio.test.ts",
+    "tests/linked-intelligence.test.ts",
     "app/lib/gex-intelligence/**/*.ts",
     "app/lib/gex-curve/**/*.ts",
     "app/lib/open-interest-studio/**/*.ts",
+    "app/lib/intelligence/selection-linking.ts",
     "app/lib/market/types.ts",
     "app/lib/market/reported-values.ts"
   ]

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { Focus, Info, Search, Sparkles } from "lucide-react";
+import { BarChart3, CircleDot, Focus, Info, Network, Search, Sparkles, Timer } from "lucide-react";
 import { analyzeGexIntelligence } from "../lib/gex-intelligence";
 import type { GexLevelAssessment, IntelligenceScore } from "../lib/gex-intelligence";
 import type { ExposureStrike, MarketRead } from "../lib/market/types";
@@ -18,6 +18,33 @@ const layerOptions: Array<{ id: Layer; label: string; detail: string }> = [
 ];
 
 const unavailableLayers = ["Delta", "Gamma", "Vanna", "Charm", "Vega"];
+
+const visualizations = [
+  { id: "ladder", label: "Ladder", description: "Current provider-backed exposure by strike.", icon: Network, available: true },
+  { id: "curve", label: "Curve", description: "Inspect exposure as a strike curve.", icon: BarChart3, available: false },
+  { id: "histogram", label: "Histogram", description: "Compare exposure distribution by strike.", icon: CircleDot, available: false },
+  { id: "heatmap", label: "Heatmap", description: "Compare exposure across grouped dimensions.", icon: Sparkles, available: false },
+  { id: "profile", label: "Profile", description: "Read the exposure profile around spot.", icon: Network, available: false },
+  { id: "surface", label: "Surface", description: "Inspect a multi-dimensional exposure surface.", icon: Timer, available: false },
+] as const;
+
+function GexVisualizationSelector() {
+  return <aside className="gexStudioSelector" aria-label="GEX visualization selector">
+    <header className="gexToolboxHeader">
+      <span>Visualization</span>
+    </header>
+    <div className="gexVisualizationList">
+      {visualizations.map((view) => {
+        const Icon = view.icon;
+        return <button key={view.id} type="button" aria-pressed={view.available} aria-controls={view.available ? "gex-studio-workspace" : undefined} disabled={!view.available} className={classNames(view.available && "active", !view.available && "planned")} title={view.available ? view.description : `${view.label} is planned`}>
+          <Icon size={15} aria-hidden="true" />
+          <span><b>{view.label}</b><small>{view.available ? "Available now" : "Coming Later"}</small></span>
+        </button>;
+      })}
+    </div>
+    <footer><a href="#gex-studio-workspace"><Info size={13} /> Studio guide</a></footer>
+  </aside>;
+}
 
 function scoreText(score: IntelligenceScore) {
   return score.availability === "available" && score.score !== null ? `${score.score}/100` : "N/A";
@@ -59,13 +86,16 @@ function scoreTone(score: number | null) {
 type Props = { market: MarketRead | null };
 
 function GexUnavailableState({ reason }: { reason: string }) {
-  return <section className="gexIntelligence gexUnavailable" aria-label="GEX intelligence unavailable">
+  return <section className="gexIntelligence gexUnavailable" aria-label="GEX Studio unavailable">
     <header className="gexTitleBar gexUnavailableTitle">
-      <div><span>GEX INTELLIGENCE</span><h2>Exposure structure unavailable</h2><p>{reason}</p></div>
+      <div><span>GEX STUDIO</span><h2>Exposure structure unavailable</h2><p>{reason}</p></div>
       <span className="gexUnavailableStatus">Provider data unavailable</span>
     </header>
 
-    <div className="gexToolbar gexToolbarDisabled" aria-label="Unavailable GEX controls" aria-disabled="true">
+    <div className="gexStudioLayout">
+      <GexVisualizationSelector />
+      <div className="gexStudioWorkspace" id="gex-studio-workspace">
+        <div className="gexToolbar gexToolbarDisabled" aria-label="Unavailable GEX controls" aria-disabled="true">
       <div className="gexControlGroup"><span className="gexControlLabel">Layer</span><div className="gexSegments">{layerOptions.map((item) => <button key={item.id} type="button" disabled>{item.label}</button>)}</div></div>
       <div className="gexControlGroup"><span className="gexControlLabel">Exposure</span><div className="gexSegments"><button type="button" disabled>Gross</button><button type="button" disabled>Calls</button><button type="button" disabled>Puts</button></div></div>
       <div className="gexControlGroup gexNoise"><span className="gexControlLabel">Noise filter</span><div className="gexSegments">{["All", "60+", "70+", "80+", "90+"].map((item) => <button key={item} type="button" disabled>{item}</button>)}</div></div>
@@ -76,19 +106,24 @@ function GexUnavailableState({ reason }: { reason: string }) {
 
     <div className="gexScope"><Info size={14} /><span>The page structure remains available. Scores and provider-backed exposure will appear after a supported option-chain read is available.</span></div>
 
-    <div className="gexLayout" aria-busy="true">
+    <div className="gexStudioMain" aria-busy="true">
+      <div className="gexStudioCenter">
       <section className="gexMapPanel" aria-label="GEX map awaiting provider data">
         <header><div><span>GEX MAP</span><h3>Exposure by strike</h3></div><div className="gexMapLegend"><span className="pending">Awaiting provider data</span></div></header>
         <div className="gexMapCanvas gexSkeletonMap">{Array.from({ length: 9 }, (_, index) => <div className="gexSkeletonRow" key={index}><i /><span /><b /></div>)}<div className="gexSkeletonMessage"><strong>Provider-backed exposure required</strong><span>No strike values, bars, or scores are shown until data is available.</span></div></div>
       </section>
 
+      <section className="gexDetailPanel gexSkeletonDetail"><header><div><span>Selected level</span><h3>Unavailable</h3></div></header><div className="gexDetailScores">{["Confluence", "Level strength", "Isolation", "Open interest", "Net GEX"].map((item) => <div key={item}><small>{item}</small><i /></div>)}</div><div className="gexExplanation"><h4>Engine context</h4><p>Level-specific analysis becomes available only when the provider returns a supported option-chain exposure snapshot.</p></div></section>
+      </div>
+
       <aside className="gexSidePanel" aria-label="GEX intelligence panels awaiting provider data">
+        <section className="gexAnalysisSummary gexSkeletonCard"><span>Analysis</span><strong>Current view: Ladder</strong><p>Market context, level strength, confluence, and isolation require provider-backed exposure.</p><div><i /><i /><i /></div></section>
         <section className="gexClarityCard gexSkeletonCard"><span>Market clarity</span><i /><b>Unavailable</b><p>Requires current provider-backed exposure.</p></section>
         <section className="gexStrongest gexSkeletonStrongest"><header><div><Sparkles size={15} /><span>Strongest levels</span></div><small>Awaiting data</small></header>{Array.from({ length: 5 }, (_, index) => <div className="gexSkeletonLevel" key={index}><i /><span /></div>)}</section>
       </aside>
     </div>
-
-    <section className="gexDetailPanel gexSkeletonDetail"><header><div><span>Selected level</span><h3>Unavailable</h3></div></header><div className="gexDetailScores">{["Confluence", "Level strength", "Isolation", "Open interest", "Net GEX"].map((item) => <div key={item}><small>{item}</small><i /></div>)}</div><div className="gexExplanation"><h4>Engine context</h4><p>Level-specific analysis becomes available only when the provider returns a supported option-chain exposure snapshot.</p></div></section>
+      </div>
+    </div>
   </section>;
 }
 
@@ -140,13 +175,16 @@ export function GexIntelligencePanel({ market }: Props) {
     return <GexUnavailableState reason={intelligence?.warnings[0] ?? "Provider-backed option-chain exposure is required before this analysis can be displayed."} />;
   }
 
-  return <section className="gexIntelligence" aria-label="GEX intelligence">
+  return <section className="gexIntelligence" aria-label="GEX Studio">
     <header className="gexTitleBar">
-      <div><span>GEX INTELLIGENCE</span><h2>{availableMarket.symbol} exposure structure</h2><p>Provider-backed chain snapshot. Scores describe current exposure structure, not a trade recommendation.</p></div>
+      <div><span>GEX STUDIO</span><h2>{availableMarket.symbol} exposure structure</h2><p>Provider-backed chain snapshot. Scores describe current exposure structure, not a trade recommendation.</p></div>
       <div className="gexHeaderStats"><div><small>Market clarity</small><strong>{scoreText(intelligence.marketClarity)}</strong><span>{intelligence.marketClarity.direction}</span></div><div><small>Confluence</small><strong>{scoreText(intelligence.confluence)}</strong><span>Current snapshot</span></div></div>
     </header>
 
-    <div className="gexToolbar" aria-label="GEX controls">
+    <div className="gexStudioLayout">
+      <GexVisualizationSelector />
+      <div className="gexStudioWorkspace" id="gex-studio-workspace">
+        <div className="gexToolbar" aria-label="GEX controls">
       <div className="gexControlGroup"><span className="gexControlLabel">Layer</span><div className="gexSegments">{layerOptions.map((item) => <button key={item.id} type="button" className={classNames(layer === item.id && "active")} onClick={() => { setLayer(item.id); if (item.id === "netGex") setSide("combined"); }} title={item.detail}>{item.label}</button>)}{unavailableLayers.map((item) => <button key={item} type="button" className="layerUnavailable" disabled title={`${item} requires a provider-backed metric not present in this read`} aria-label={`${item} unavailable`}>{item}</button>)}</div></div>
       <div className="gexControlGroup"><span className="gexControlLabel">Exposure</span><div className="gexSegments">{(["combined", "calls", "puts"] as Side[]).map((item) => { const unavailable = layer === "netGex" && item !== "combined"; return <button key={item} type="button" className={classNames(side === item && "active")} disabled={unavailable} title={unavailable ? "Net GEX is already combined by strike" : undefined} onClick={() => setSide(item)}>{item === "combined" ? layer === "gex" ? "Gross" : layer === "netGex" ? "Net" : "Combined" : item === "calls" ? "Calls" : "Puts"}</button>; })}</div></div>
       <div className="gexControlGroup gexNoise"><span className="gexControlLabel">Noise filter</span><div className="gexSegments">{([0, 60, 70, 80, 90] as Filter[]).map((item) => <button key={item} type="button" className={classNames(filter === item && "active")} onClick={() => setFilter(item)}>{item ? `${item}+` : "All"}</button>)}</div></div>
@@ -157,7 +195,8 @@ export function GexIntelligencePanel({ market }: Props) {
 
     <div className="gexScope"><Info size={14} /><span>Layer values use the current provider-backed chain. {unavailableLayers.join(", ")} remain unavailable because this read does not expose them as supported GEX Intelligence layers.</span></div>
 
-    <div className="gexLayout">
+    <div className="gexStudioMain">
+      <div className="gexStudioCenter">
       <section className="gexMapPanel" aria-label="GEX map">
         <header><div><span>GEX MAP</span><h3>{layerOptions.find((item) => item.id === layer)?.label} by strike</h3></div><div className="gexMapLegend"><span className="positive">Positive</span><span className="negative">Negative</span><span className="spot">Spot {price(availableMarket.snapshot.spot)}</span></div></header>
         <div className="gexMapCanvas" style={{ "--gex-map-scale": mapScale } as React.CSSProperties}>
@@ -175,14 +214,18 @@ export function GexIntelligencePanel({ market }: Props) {
         </div>
       </section>
 
+    <section className="gexDetailPanel" aria-live="polite">
+      {selectedRow ? <><header><div><span>Selected level</span><h3>{price(selectedRow.strike)}</h3></div><span className={classNames("gexDirection", selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}>{directionLabel(selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}</span></header><div className="gexDetailScores"><div><small>Confluence</small><strong>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</strong></div><div><small>Level strength</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</strong></div><div><small>Isolation</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</strong></div><div><small>Open interest</small><strong>{(selectedRow.callOpenInterest + selectedRow.putOpenInterest).toLocaleString()}</strong></div><div><small>Net GEX</small><strong className={selectedRow.netGex >= 0 ? "green" : "red"}>{money(selectedRow.netGex)}</strong></div></div><div className="gexExplanation"><h4>Engine context</h4>{selectedAssessment ? <><p>{selectedAssessment.confluence.explanation}</p><ul>{selectedAssessment.confluence.inputs.map((item) => <li key={item}>{item}</li>)}</ul></> : <p>This provider-backed strike is displayed in the full exposure structure. It is not in the engine&apos;s ranked score set, so no intelligence score is inferred.</p>}</div></> : <div className="surfaceEmpty"><strong>No level selected</strong><span>Select a visible provider-backed strike to inspect its available context.</span></div>}
+    </section>
+      </div>
+
       <aside className="gexSidePanel" aria-label="GEX intelligence details">
+        <section className="gexAnalysisSummary" aria-live="polite"><span>Analysis</span><strong>Current view: Ladder</strong><p>{selectedAssessment?.confluence.explanation ?? "Select a provider-backed strike to inspect its available analysis."}</p><dl><div><dt>Confluence</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</dd></div><div><dt>Level strength</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</dd></div><div><dt>Isolation</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</dd></div></dl></section>
         <section className="gexClarityCard"><span>Market clarity</span><strong>{scoreText(intelligence.marketClarity)}</strong><b>{intelligence.marketClarity.direction}</b><p>{intelligence.marketClarity.explanation}</p></section>
         <section className="gexStrongest"><header><div><Sparkles size={15} /><span>Strongest levels</span></div><small>Top {Math.min(5, levels.length)}</small></header>{levels.slice(0, 5).map((level) => <button type="button" key={level.strike} className={classNames(selectedRow?.strike === level.strike && "selected")} onClick={() => setSelectedStrike(level.strike)}><b>{price(level.strike)}</b><span>{levelScore(level)}</span><small>{directionLabel(level.direction)}</small></button>)}</section>
       </aside>
     </div>
-
-    <section className="gexDetailPanel" aria-live="polite">
-      {selectedRow ? <><header><div><span>Selected level</span><h3>{price(selectedRow.strike)}</h3></div><span className={classNames("gexDirection", selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}>{directionLabel(selectedAssessment?.direction ?? rawDirection(selectedRow.netGex))}</span></header><div className="gexDetailScores"><div><small>Confluence</small><strong>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</strong></div><div><small>Level strength</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</strong></div><div><small>Isolation</small><strong>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</strong></div><div><small>Open interest</small><strong>{(selectedRow.callOpenInterest + selectedRow.putOpenInterest).toLocaleString()}</strong></div><div><small>Net GEX</small><strong className={selectedRow.netGex >= 0 ? "green" : "red"}>{money(selectedRow.netGex)}</strong></div></div><div className="gexExplanation"><h4>Engine context</h4>{selectedAssessment ? <><p>{selectedAssessment.confluence.explanation}</p><ul>{selectedAssessment.confluence.inputs.map((item) => <li key={item}>{item}</li>)}</ul></> : <p>This provider-backed strike is displayed in the full exposure structure. It is not in the engine&apos;s ranked score set, so no intelligence score is inferred.</p>}</div></> : <div className="surfaceEmpty"><strong>No level selected</strong><span>Select a visible provider-backed strike to inspect its available context.</span></div>}
-    </section>
+      </div>
+    </div>
   </section>;
 }

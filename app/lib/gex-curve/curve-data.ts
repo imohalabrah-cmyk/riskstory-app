@@ -8,6 +8,10 @@ export type GexCurvePoint = {
   value: number;
 };
 
+export type GexProfileRow = GexCurvePoint & {
+  totalOpenInterest: number | null;
+};
+
 export type GexCurveMeasure = {
   label: string;
   unit: "gex" | "contracts";
@@ -50,4 +54,18 @@ export function buildGexCurvePoints(rows: ExposureStrike[], layer: CurveLayer, s
     .map((row) => ({ strike: row.strike, value: curveValue(row, layer, side) }))
     .filter((point) => Number.isFinite(point.strike) && point.strike > 0 && Number.isFinite(point.value))
     .sort((left, right) => left.strike - right.strike);
+}
+
+export function buildGexProfileRows(rows: ExposureStrike[], layer: CurveLayer, side: CurveSide): GexProfileRow[] {
+  return rows
+    .map((row) => {
+      const totalOpenInterest = row.callOpenInterest + row.putOpenInterest;
+      return {
+        strike: row.strike,
+        value: curveValue(row, layer, side),
+        totalOpenInterest: Number.isFinite(totalOpenInterest) ? totalOpenInterest : null,
+      };
+    })
+    .filter((row) => Number.isFinite(row.strike) && row.strike > 0 && Number.isFinite(row.value))
+    .sort((left, right) => right.strike - left.strike);
 }

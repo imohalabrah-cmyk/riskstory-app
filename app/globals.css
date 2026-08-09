@@ -392,3 +392,18 @@ select:focus-visible {
   .heatControls,
   .gexToolbar { padding: 10px; }
 }
+
+.gexProfile { min-height: clamp(420px, 57dvh, 740px); padding: 14px 16px 10px; overflow: hidden; background: linear-gradient(180deg, rgba(7, 17, 29, .72), rgba(8, 14, 24, .34)); }
+.gexProfileCanvas { max-height: clamp(390px, 54dvh, 690px); overflow: auto; scrollbar-color: rgba(93, 139, 190, .55) transparent; }
+.gexProfile svg { display: block; min-width: 680px; width: 100%; height: auto; overflow: visible; }
+.gexProfileBaseline { stroke: rgba(214, 174, 75, .74); stroke-width: 1.2; stroke-dasharray: 4 4; }
+.gexProfileBaselineLabel { fill: #d7b85b; font-size: 11px; font-weight: 800; }
+.gexProfileRowGuide { stroke: rgba(151, 170, 198, .08); stroke-width: 1; }
+.gexProfileStrike { fill: var(--rs-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.gexProfileBar { fill: var(--rs-chart-positive); opacity: .88; cursor: pointer; transition: opacity .12s ease, stroke .12s ease; }
+.gexProfileBar.negative { fill: var(--rs-chart-negative); }
+.gexProfile g.selected .gexProfileBar, .gexProfileBar:hover, .gexProfileBar:focus-visible { stroke: var(--rs-cyan); stroke-width: 2; opacity: 1; outline: 0; }
+.gexProfileSpot line { stroke: var(--rs-cyan); stroke-width: 1.25; stroke-dasharray: 4 5; opacity: .88; }
+.gexProfileSpot text { fill: var(--rs-cyan); font-size: 10px; font-weight: 800; }
+.gexProfileAxisLabel { fill: var(--rs-muted); font-size: 10px; font-weight: 700; }
+.gexProfile > p { margin: 4px 4px 0; color: var(--rs-muted); font-size: 10px; line-height: 1.45; }

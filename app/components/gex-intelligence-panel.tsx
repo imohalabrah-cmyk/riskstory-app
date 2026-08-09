@@ -7,13 +7,15 @@ import type { GexLevelAssessment, IntelligenceScore } from "../lib/gex-intellige
 import type { CurveLayer, CurveSide } from "../lib/gex-curve/curve-data";
 import type { ExposureStrike, MarketRead } from "../lib/market/types";
 import { GexGammaCurve } from "./gex-gamma-curve";
+import { GexGammaHeatmap } from "./gex-gamma-heatmap";
+import { GexGammaHistogram } from "./gex-gamma-histogram";
 import { GexGammaProfile } from "./gex-gamma-profile";
 import { classNames, money, price } from "./utils";
 
 type Layer = CurveLayer;
 type Side = CurveSide;
 type Filter = 0 | 60 | 70 | 80 | 90;
-type Visualization = "ladder" | "curve" | "profile";
+type Visualization = "ladder" | "curve" | "histogram" | "heatmap" | "profile";
 
 const layerOptions: Array<{ id: Layer; label: string; detail: string }> = [
   { id: "gex", label: "Combined GEX", detail: "Gross call and put GEX magnitude" },
@@ -26,8 +28,8 @@ const unavailableLayers = ["Delta", "Gamma", "Vanna", "Charm", "Vega"];
 const visualizations = [
   { id: "ladder", label: "Ladder", description: "Current provider-backed exposure by strike.", icon: Network, available: true },
   { id: "curve", label: "Curve", description: "Inspect current provider-backed exposure as a strike curve.", icon: BarChart3, available: true },
-  { id: "histogram", label: "Histogram", description: "Compare exposure distribution by strike.", icon: CircleDot, available: false },
-  { id: "heatmap", label: "Heatmap", description: "Compare exposure across grouped dimensions.", icon: Sparkles, available: false },
+  { id: "histogram", label: "Histogram", description: "Compare current exposure magnitude and direction across strikes.", icon: CircleDot, available: true },
+  { id: "heatmap", label: "Heatmap", description: "Inspect current strike exposure dimensions as a matrix.", icon: Sparkles, available: true },
   { id: "profile", label: "Profile", description: "Read current provider-backed exposure horizontally around spot.", icon: Network, available: true },
   { id: "surface", label: "Surface", description: "Inspect a multi-dimensional exposure surface.", icon: Timer, available: false },
 ] as const;
@@ -204,9 +206,9 @@ export function GexIntelligencePanel({ market }: Props) {
 
     <div className="gexStudioMain">
       <div className="gexStudioCenter">
-      <section className="gexMapPanel" aria-label={visualization === "curve" ? "GEX curve" : "GEX map"}>
-        <header><div><span>{visualization === "curve" ? "GEX CURVE" : visualization === "profile" ? "GEX PROFILE" : "GEX MAP"}</span><h3>{layerOptions.find((item) => item.id === layer)?.label} by strike</h3></div><div className="gexMapLegend"><span className="positive">Positive</span><span className="negative">Negative</span><span className="spot">Spot {price(availableMarket.snapshot.spot)}</span></div></header>
-        {visualization === "curve" ? <GexGammaCurve rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : visualization === "profile" ? <GexGammaProfile rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : <div className="gexMapCanvas" style={{ "--gex-map-scale": mapScale } as React.CSSProperties}>
+      <section className="gexMapPanel" aria-label={visualization === "curve" ? "GEX curve" : visualization === "histogram" ? "GEX histogram" : visualization === "heatmap" ? "GEX heatmap" : visualization === "profile" ? "GEX profile" : "GEX map"}>
+        <header><div><span>{visualization === "curve" ? "GEX CURVE" : visualization === "histogram" ? "GEX HISTOGRAM" : visualization === "heatmap" ? "GEX HEATMAP" : visualization === "profile" ? "GEX PROFILE" : "GEX MAP"}</span><h3>{layerOptions.find((item) => item.id === layer)?.label} by strike</h3></div><div className="gexMapLegend"><span className="positive">Positive</span><span className="negative">Negative</span><span className="spot">Spot {price(availableMarket.snapshot.spot)}</span></div></header>
+        {visualization === "curve" ? <GexGammaCurve rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : visualization === "histogram" ? <GexGammaHistogram rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : visualization === "heatmap" ? <GexGammaHeatmap rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : visualization === "profile" ? <GexGammaProfile rows={visibleRows} layer={layer} side={side} spot={availableMarket.snapshot.spot} selectedStrike={selectedRow?.strike ?? null} onSelectStrike={setSelectedStrike} /> : <div className="gexMapCanvas" style={{ "--gex-map-scale": mapScale } as React.CSSProperties}>
           {visibleRows.length ? visibleRows.map((row) => {
             const assessment = assessmentByStrike.get(row.strike);
             const value = displayValue(row, layer, side);
@@ -227,7 +229,7 @@ export function GexIntelligencePanel({ market }: Props) {
       </div>
 
       <aside className="gexSidePanel" aria-label="GEX intelligence details">
-        <section className="gexAnalysisSummary" aria-live="polite"><span>Analysis</span><strong>Current view: {visualization === "curve" ? "Curve" : visualization === "profile" ? "Profile" : "Ladder"}</strong><p>{selectedAssessment?.confluence.explanation ?? "Select a provider-backed strike to inspect its available analysis."}</p><dl><div><dt>Confluence</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</dd></div><div><dt>Level strength</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</dd></div><div><dt>Isolation</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</dd></div></dl></section>
+        <section className="gexAnalysisSummary" aria-live="polite"><span>Analysis</span><strong>Current view: {visualization === "curve" ? "Curve" : visualization === "histogram" ? "Histogram" : visualization === "heatmap" ? "Heatmap" : visualization === "profile" ? "Profile" : "Ladder"}</strong><p>{selectedAssessment?.confluence.explanation ?? "Select a provider-backed strike to inspect its available analysis."}</p><dl><div><dt>Confluence</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.confluence) : "N/A"}</dd></div><div><dt>Level strength</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelStrength) : "N/A"}</dd></div><div><dt>Isolation</dt><dd>{selectedAssessment ? scoreText(selectedAssessment.levelIsolation) : "N/A"}</dd></div></dl></section>
         <section className="gexClarityCard"><span>Market clarity</span><strong>{scoreText(intelligence.marketClarity)}</strong><b>{intelligence.marketClarity.direction}</b><p>{intelligence.marketClarity.explanation}</p></section>
         <section className="gexStrongest"><header><div><Sparkles size={15} /><span>Strongest levels</span></div><small>Top {Math.min(5, levels.length)}</small></header>{levels.slice(0, 5).map((level) => <button type="button" key={level.strike} className={classNames(selectedRow?.strike === level.strike && "selected")} onClick={() => setSelectedStrike(level.strike)}><b>{price(level.strike)}</b><span>{levelScore(level)}</span><small>{directionLabel(level.direction)}</small></button>)}</section>
       </aside>

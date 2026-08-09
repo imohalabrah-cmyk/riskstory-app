@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildGexCurvePoints, buildGexProfileRows, curveMeasure, curveValue } from "../app/lib/gex-curve/curve-data";
+import { buildGexCurvePoints, buildGexHeatmapRows, buildGexProfileRows, curveMeasure, curveValue } from "../app/lib/gex-curve/curve-data";
 import type { ExposureStrike } from "../app/lib/market/types";
 
 const row: ExposureStrike = {
@@ -53,4 +53,39 @@ test("profile rows retain actual strike/value mapping and preserve Net GEX sign"
 test("profile uses Gross GEX and does not invent rows for missing values", () => {
   const rows = buildGexProfileRows([{ ...row, strike: 742, callGex: 51, putGex: -29 }, { ...row, strike: 741, callGex: Number.NaN }], "gex", "combined");
   assert.deepEqual(rows, [{ strike: 742, value: 80, totalOpenInterest: 200 }]);
+});
+
+test("heatmap maps actual provider strike rows to Call, Put, and Gross GEX cells", () => {
+  const rows = buildGexHeatmapRows([{ ...row, strike: 742, callGex: 51, putGex: -29, netGex: 22 }], "gex");
+  assert.deepEqual(rows, [{
+    strike: 742,
+    totalOpenInterest: 200,
+    cells: [
+      { id: "callGex", label: "Call GEX", unit: "gex", signed: true, value: 51 },
+      { id: "putGex", label: "Put GEX", unit: "gex", signed: true, value: -29 },
+      { id: "grossGex", label: "Gross GEX", unit: "gex", signed: false, value: 80 },
+    ],
+  }]);
+});
+
+test("heatmap preserves Net GEX sign and marks missing provider metrics unavailable", () => {
+  const rows = buildGexHeatmapRows([{ ...row, strike: 741, netGex: -17 }, { ...row, strike: 740, netGex: Number.NaN }], "netGex");
+  assert.deepEqual(rows, [{
+    strike: 741,
+    totalOpenInterest: 200,
+    cells: [{ id: "netGex", label: "Net GEX", unit: "gex", signed: true, value: -17 }],
+  }]);
+});
+
+test("heatmap retains a real strike row when one source cell is missing without creating a replacement", () => {
+  const rows = buildGexHeatmapRows([{ ...row, strike: 743, callGex: Number.NaN, putGex: -30 }], "gex");
+  assert.deepEqual(rows, [{
+    strike: 743,
+    totalOpenInterest: 200,
+    cells: [
+      { id: "callGex", label: "Call GEX", unit: "gex", signed: true, value: null },
+      { id: "putGex", label: "Put GEX", unit: "gex", signed: true, value: -30 },
+      { id: "grossGex", label: "Gross GEX", unit: "gex", signed: false, value: null },
+    ],
+  }]);
 });

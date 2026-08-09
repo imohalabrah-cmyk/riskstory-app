@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Minus, Plus, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
 import type { ExposureStrike, MarketRead } from "../lib/market/types";
+import { combineReportedValues } from "../lib/market/reported-values";
 import { Panel } from "./panel";
 import { classNames, price } from "./utils";
 
@@ -13,8 +14,8 @@ const LAYERS = ["Open Interest", "Net GEX", "Delta", "Gamma", "Vanna", "Charm", 
 const ROW_HEIGHT = 42;
 const OVERSCAN = 7;
 
-function readableOi(value: number) { return value >= 1000 ? `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}K` : String(Math.round(value)); }
-function sideValue(row: ExposureStrike, side: Side) { return side === "calls" ? row.callOpenInterest : side === "puts" ? row.putOpenInterest : row.callOpenInterest + row.putOpenInterest; }
+function readableOi(value: number | null) { return value === null ? "N/A" : value >= 1000 ? `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}K` : String(Math.round(value)); }
+function sideValue(row: ExposureStrike, side: Side) { return side === "calls" ? row.callOpenInterest : side === "puts" ? row.putOpenInterest : combineReportedValues(row.callOpenInterest, row.putOpenInterest); }
 
 export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onExpand, onSymbol, compact = false }: Props) {
   const [side, setSide] = useState<Side>("combined");
@@ -39,9 +40,9 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
     if (exact.length) return exact;
     return candidates.length ? [candidates.reduce((closest, row) => Math.abs(row.strike - needle) < Math.abs(closest.strike - needle) ? row : closest)] : [];
   }, [available, expirations, query]);
-  const globalMax = useMemo(() => Math.max(1, ...expirations.flatMap((item) => item.rows.map((row) => sideValue(row, side)))), [expirations, side]);
+  const globalMax = useMemo(() => Math.max(1, ...expirations.flatMap((item) => item.rows.flatMap((row) => { const value = sideValue(row, side); return typeof value === "number" ? [value] : []; }))), [expirations, side]);
   const expirationRows = useMemo(() => new Map(expirations.map((item) => [item.expiration, new Map(item.rows.map((row) => [row.strike, row]))])), [expirations]);
-  const expirationMax = useMemo(() => new Map(expirations.map((item) => [item.expiration, Math.max(1, ...item.rows.map((row) => sideValue(row, side)))])), [expirations, side]);
+  const expirationMax = useMemo(() => new Map(expirations.map((item) => [item.expiration, Math.max(1, ...item.rows.flatMap((row) => { const value = sideValue(row, side); return typeof value === "number" ? [value] : []; }))])), [expirations, side]);
   const symbolOptions = useMemo(() => Array.from(new Set([available?.symbol, "SPY", "SPX", "QQQ"].filter(Boolean))) as string[], [available?.symbol]);
   const nearestStrike = useMemo(() => {
     const requested = Number(query);
@@ -61,11 +62,11 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
   };
   const cell = (row: ExposureStrike, item: { expiration: string; rows: ExposureStrike[] }) => {
     const target = expirationRows.get(item.expiration)?.get(row.strike);
-    const value = target ? sideValue(target, side) : 0;
+    const value = target ? sideValue(target, side) : null;
     const max = scaleMode === "global" ? globalMax : expirationMax.get(item.expiration) ?? 1;
-    const intensity = Math.max(.025, Math.min(1, value / max));
+    const intensity = value === null ? .025 : Math.max(.025, Math.min(1, value / max));
     const active = hovered?.strike === row.strike && hovered.expiration === item.expiration;
-    return <button key={item.expiration} type="button" className={classNames("heatCell", side, active && "hovered")} style={{ "--heat-intensity": intensity } as React.CSSProperties} onMouseEnter={() => setHovered({ strike: row.strike, expiration: item.expiration, value })} onFocus={() => setHovered({ strike: row.strike, expiration: item.expiration, value })} onMouseLeave={() => setHovered(null)} aria-label={`${item.expiration}, strike ${price(row.strike)}, ${readableOi(value)} open interest`}><span>{readableOi(value)}</span></button>;
+    return <button key={item.expiration} type="button" className={classNames("heatCell", side, active && "hovered")} style={{ "--heat-intensity": intensity } as React.CSSProperties} onMouseEnter={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onFocus={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onMouseLeave={() => setHovered(null)} aria-label={`${item.expiration}, strike ${price(row.strike)}, ${readableOi(value)} open interest`}><span>{readableOi(value)}</span></button>;
   };
 
   return <Panel title={title} onExpand={onExpand} className={classNames("heatPanel", "heatmapIntelligence", compact && "heatCompact")}>

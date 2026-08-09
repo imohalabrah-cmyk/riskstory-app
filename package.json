@@ -9,6 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:gex-intelligence": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/gex-intelligence.test.js .test-build/tests/gex-curve.test.js",
+    "test:oi-data-semantics": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/oi-data-semantics.test.js",
+    "test:open-interest-studio": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/open-interest-studio.test.js",
     "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-opennext-worker.mjs",
     "preview": "npm run build:cloudflare && opennextjs-cloudflare preview",
     "deploy": "npm run build:cloudflare && opennextjs-cloudflare deploy",

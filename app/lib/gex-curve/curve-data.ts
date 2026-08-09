@@ -1,4 +1,5 @@
 import type { ExposureStrike } from "../market/types";
+import { combineReportedValues } from "../market/reported-values";
 
 export type CurveLayer = "gex" | "netGex" | "openInterest";
 export type CurveSide = "combined" | "calls" | "puts";
@@ -54,7 +55,7 @@ export function curveValue(row: ExposureStrike, layer: CurveLayer, side: CurveSi
   if (layer === "openInterest") {
     if (side === "calls") return row.callOpenInterest;
     if (side === "puts") return row.putOpenInterest;
-    return row.callOpenInterest + row.putOpenInterest;
+    return combineReportedValues(row.callOpenInterest, row.putOpenInterest);
   }
 
   if (layer === "netGex") return row.netGex;
@@ -64,27 +65,22 @@ export function curveValue(row: ExposureStrike, layer: CurveLayer, side: CurveSi
 }
 
 export function buildGexCurvePoints(rows: ExposureStrike[], layer: CurveLayer, side: CurveSide): GexCurvePoint[] {
-  return rows
-    .map((row) => ({ strike: row.strike, value: curveValue(row, layer, side) }))
-    .filter((point) => Number.isFinite(point.strike) && point.strike > 0 && Number.isFinite(point.value))
-    .sort((left, right) => left.strike - right.strike);
+  return rows.flatMap((row) => {
+    const value = curveValue(row, layer, side);
+    if (!Number.isFinite(row.strike) || row.strike <= 0 || typeof value !== "number" || !Number.isFinite(value)) return [];
+    return [{ strike: row.strike, value }];
+  }).sort((left, right) => left.strike - right.strike);
 }
 
 export function buildGexProfileRows(rows: ExposureStrike[], layer: CurveLayer, side: CurveSide): GexProfileRow[] {
-  return rows
-    .map((row) => {
-      const totalOpenInterest = row.callOpenInterest + row.putOpenInterest;
-      return {
-        strike: row.strike,
-        value: curveValue(row, layer, side),
-        totalOpenInterest: Number.isFinite(totalOpenInterest) ? totalOpenInterest : null,
-      };
-    })
-    .filter((row) => Number.isFinite(row.strike) && row.strike > 0 && Number.isFinite(row.value))
-    .sort((left, right) => right.strike - left.strike);
+  return rows.flatMap((row) => {
+    const value = curveValue(row, layer, side);
+    if (!Number.isFinite(row.strike) || row.strike <= 0 || typeof value !== "number" || !Number.isFinite(value)) return [];
+    return [{ strike: row.strike, value, totalOpenInterest: combineReportedValues(row.callOpenInterest, row.putOpenInterest) }];
+  }).sort((left, right) => right.strike - left.strike);
 }
 
-type HeatmapColumnDefinition = Omit<GexHeatmapCell, "value"> & { value: (row: ExposureStrike) => number };
+type HeatmapColumnDefinition = Omit<GexHeatmapCell, "value"> & { value: (row: ExposureStrike) => number | null };
 
 function heatmapColumns(layer: CurveLayer): HeatmapColumnDefinition[] {
   if (layer === "netGex") {
@@ -95,7 +91,7 @@ function heatmapColumns(layer: CurveLayer): HeatmapColumnDefinition[] {
     return [
       { id: "callOpenInterest", label: "Call OI", unit: "contracts", signed: false, value: (row) => row.callOpenInterest },
       { id: "putOpenInterest", label: "Put OI", unit: "contracts", signed: false, value: (row) => row.putOpenInterest },
-      { id: "combinedOpenInterest", label: "Combined OI", unit: "contracts", signed: false, value: (row) => row.callOpenInterest + row.putOpenInterest },
+      { id: "combinedOpenInterest", label: "Combined OI", unit: "contracts", signed: false, value: (row) => combineReportedValues(row.callOpenInterest, row.putOpenInterest) },
     ];
   }
 
@@ -111,12 +107,12 @@ export function buildGexHeatmapRows(rows: ExposureStrike[], layer: CurveLayer): 
   return rows
     .filter((row) => Number.isFinite(row.strike) && row.strike > 0)
     .map((row) => {
-      const totalOpenInterest = row.callOpenInterest + row.putOpenInterest;
+      const totalOpenInterest = combineReportedValues(row.callOpenInterest, row.putOpenInterest);
       const cells = columns.map((column) => {
         const value = column.value(row);
-        return { id: column.id, label: column.label, unit: column.unit, signed: column.signed, value: Number.isFinite(value) ? value : null };
+        return { id: column.id, label: column.label, unit: column.unit, signed: column.signed, value: typeof value === "number" && Number.isFinite(value) ? value : null };
       });
-      return { strike: row.strike, totalOpenInterest: Number.isFinite(totalOpenInterest) ? totalOpenInterest : null, cells };
+      return { strike: row.strike, totalOpenInterest, cells };
     })
     .filter((row) => row.cells.some((cell) => cell.value !== null))
     .sort((left, right) => right.strike - left.strike);

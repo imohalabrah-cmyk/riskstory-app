@@ -12,7 +12,7 @@ const titles: Record<ViewId, [string, string]> = {
   trinity: ["Trinity View", "Linked SPX, SPY, and QQQ positioning with independent expiry control."],
   flow: ["Options Flow", "Filter notable options activity by asset, structure, premium, and direction."],
   chart: ["Chart Lab", "Interactive price action with gamma levels and positioning intelligence."],
-  openInterest: ["Open Interest", "Daily positioning map and morning scenario brief."],
+  openInterest: ["Open Interest Studio", "Provider-backed call and put open interest by actual expiration and strike."],
   alerts: ["Alerts", "Build precise rules for levels, flow events, and Trinity alignment."],
 };
 

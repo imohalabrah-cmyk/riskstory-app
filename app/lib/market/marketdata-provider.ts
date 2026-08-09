@@ -1,5 +1,6 @@
 import type { Candle, ExposureProfile, ExposureStrike, FlowRead, MarketDataProvider, MarketLevel, MarketRead, MarketSnapshot } from "./types";
 import { unavailableCandleRead, unavailableFlowRead, unavailableMarketRead } from "./unavailable-provider";
+import { addReportedValues, reportedNonNegative, type ReportedValue } from "./reported-values";
 
 const BASE_URL = "https://api.marketdata.app/v1";
 
@@ -249,10 +250,10 @@ async function requestOptionChain(symbol: string, range: string) {
 }
 
 type StrikeGroup = {
-  call: number;
-  put: number;
-  callVolume: number;
-  putVolume: number;
+  call?: ReportedValue;
+  put?: ReportedValue;
+  callVolume?: ReportedValue;
+  putVolume?: ReportedValue;
   callGamma: number;
   putGamma: number;
   callDex: number;
@@ -336,10 +337,6 @@ function normalizeExpiration(raw: string) {
 
 function emptyStrikeGroup(): StrikeGroup {
   return {
-    call: 0,
-    put: 0,
-    callVolume: 0,
-    putVolume: 0,
     callGamma: 0,
     putGamma: 0,
     callDex: 0,
@@ -391,10 +388,10 @@ function gammaFromDeltaCurve(
 function buildExposureProfile(groups: Map<number, StrikeGroup>, deltaRows: number, ivRows: number, optionRows: number): ExposureProfile {
   const rows: ExposureStrike[] = [...groups.entries()].map(([strike, row]) => ({
     strike,
-    callOpenInterest: row.call,
-    putOpenInterest: row.put,
-    callVolume: row.callVolume,
-    putVolume: row.putVolume,
+    callOpenInterest: row.call ?? null,
+    putOpenInterest: row.put ?? null,
+    callVolume: row.callVolume ?? null,
+    putVolume: row.putVolume ?? null,
     callGex: row.callGamma,
     putGex: -row.putGamma,
     netGex: row.callGamma - row.putGamma,
@@ -464,9 +461,9 @@ function groupByStrike(chain: MarketDataJson, spot: number) {
     const side = (sides[index] || "").toLowerCase();
     if (!(side.startsWith("c") || side.startsWith("p"))) continue;
     optionRows += 1;
-    const oi = Number.isFinite(openInterest[index]) ? Math.max(0, openInterest[index]) : 0;
-    const rowVolume = Number.isFinite(volume[index]) ? Math.max(0, volume[index]) : 0;
-    const notional = oi * 100 * spot;
+    const oi = reportedNonNegative(openInterest[index]);
+    const rowVolume = reportedNonNegative(volume[index]);
+    const notional = (oi ?? 0) * 100 * spot;
     const expirationDate = normalizeExpiration(expiration[index] || "");
     const years = optionYears(dte[index], expirationDate);
     const mark = Number.isFinite(mid[index]) && mid[index] > 0
@@ -506,15 +503,15 @@ function groupByStrike(chain: MarketDataJson, spot: number) {
     }
 
     if (side.startsWith("c")) {
-      current.call += oi;
-      current.callVolume += rowVolume;
+      current.call = addReportedValues(current.call, oi);
+      current.callVolume = addReportedValues(current.callVolume, rowVolume);
       current.callGamma += rowGamma;
       current.callDex += dex;
       current.callVanna += vanna;
       current.callCharm += charm;
     } else if (side.startsWith("p")) {
-      current.put += oi;
-      current.putVolume += rowVolume;
+      current.put = addReportedValues(current.put, oi);
+      current.putVolume = addReportedValues(current.putVolume, rowVolume);
       current.putGamma += rowGamma;
       current.putDex += dex;
       current.putVanna += vanna;
@@ -527,15 +524,15 @@ function groupByStrike(chain: MarketDataJson, spot: number) {
       const byStrike = expirationGroups.get(expirationDate) || new Map<number, StrikeGroup>();
       const expiryRow = byStrike.get(strike) || emptyStrikeGroup();
       if (side.startsWith("c")) {
-        expiryRow.call += oi;
-        expiryRow.callVolume += rowVolume;
+        expiryRow.call = addReportedValues(expiryRow.call, oi);
+        expiryRow.callVolume = addReportedValues(expiryRow.callVolume, rowVolume);
         expiryRow.callGamma += rowGamma;
         expiryRow.callDex += dex;
         expiryRow.callVanna += vanna;
         expiryRow.callCharm += charm;
       } else {
-        expiryRow.put += oi;
-        expiryRow.putVolume += rowVolume;
+        expiryRow.put = addReportedValues(expiryRow.put, oi);
+        expiryRow.putVolume = addReportedValues(expiryRow.putVolume, rowVolume);
         expiryRow.putGamma += rowGamma;
         expiryRow.putDex += dex;
         expiryRow.putVanna += vanna;
@@ -558,7 +555,10 @@ function groupByStrike(chain: MarketDataJson, spot: number) {
 
 function strongest(groups: Map<number, StrikeGroup>, key: "call" | "put") {
   return [...groups.entries()].reduce(
-    (winner, [price, row]) => (row[key] > winner.value ? { price, value: row[key] } : winner),
+    (winner, [price, row]) => {
+      const value = row[key];
+      return value !== null && value !== undefined && value > winner.value ? { price, value } : winner;
+    },
     { price: 0, value: 0 },
   );
 }

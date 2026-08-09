@@ -35,7 +35,7 @@ export function RiskStoryApp() {
         {view === "trinity" && <TrinityPanel reads={data.trinity} />}
         {view === "flow" && <FlowPanel flow={data.flow} />}
         {view === "chart" && <ChartPanel title="Chart Lab" market={data.market} candles={data.candles} range={range} onRange={setRange} frame={frame} onFrame={setFrame} onLoadOlderCandles={loadOlderCandles} />}
-        {view === "openInterest" && <OpenInterestPanel data={data.openInterest} />}
+        {view === "openInterest" && <OpenInterestPanel market={data.market} />}
         {view === "alerts" && <AlertsPanel />}
       </section>
     </main>

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CandleRead, FlowRead, MarketRead } from "../../lib/market/types";
-import type { OpenInterestDashboard } from "../../lib/open-interest/types";
 import type { AppData } from "../types";
 
 const CANDLE_POLL_INTERVAL_MS = 15 * 60 * 1000;
@@ -64,7 +63,7 @@ function canPoll(read: CandleRead | null) {
 }
 
 export function useRiskStoryData(symbol: string, range: string, frame: string) {
-  const [data, setData] = useState<AppData>({ market: null, trinity: { SPX: null, SPY: null, QQQ: null }, candles: null, flow: null, openInterest: null });
+  const [data, setData] = useState<AppData>({ market: null, trinity: { SPX: null, SPY: null, QQQ: null }, candles: null, flow: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dataRef = useRef(data);
@@ -80,12 +79,14 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
     setError(null);
     const query = new URLSearchParams({ symbol, range });
     const candleQuery = new URLSearchParams({ symbol, frame });
+    const marketRead = request<MarketRead>(`/api/market?${query}`);
     const results = await Promise.allSettled([
-      request<MarketRead>(`/api/market?${query}`),
+      marketRead,
       request<CandleRead>(`/api/candles?${candleQuery}`),
       request<FlowRead>(`/api/flow?${query}`),
-      request<OpenInterestDashboard>("/api/open-interest"),
-      ...(["SPX", "SPY", "QQQ"] as const).map((trinitySymbol) => request<MarketRead>(`/api/market?${new URLSearchParams({ symbol: trinitySymbol, range })}`)),
+      ...(["SPX", "SPY", "QQQ"] as const).map((trinitySymbol) => trinitySymbol === symbol
+        ? marketRead
+        : request<MarketRead>(`/api/market?${new URLSearchParams({ symbol: trinitySymbol, range })}`)),
     ]);
     const value = <T,>(index: number) => results[index].status === "fulfilled" ? results[index].value as T : null;
     const incomingCandles = value<CandleRead>(1);
@@ -96,8 +97,7 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
         ? reconnectingRead(current.candles!)
         : incomingCandles,
       flow: value<FlowRead>(2),
-      openInterest: value<OpenInterestDashboard>(3),
-      trinity: { SPX: value<MarketRead>(4), SPY: value<MarketRead>(5), QQQ: value<MarketRead>(6) },
+      trinity: { SPX: value<MarketRead>(3), SPY: value<MarketRead>(4), QQQ: value<MarketRead>(5) },
     }));
 
     const failed = results.filter((result) => result.status === "rejected");

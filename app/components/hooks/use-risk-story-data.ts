@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CandleRead, FlowRead, MarketRead } from "../../lib/market/types";
+import { planTrinityReads, TRINITY_SYMBOLS } from "../../lib/market/trinity-read-plan";
 import type { AppData } from "../types";
 
 const CANDLE_POLL_INTERVAL_MS = 15 * 60 * 1000;
@@ -15,6 +16,10 @@ async function request<T>(path: string) {
 
 function sameCandleContext(current: CandleRead | null, symbol: string, frame: string) {
   return current?.symbol === symbol && current.frame === frame;
+}
+
+function sameMarketContext(current: MarketRead | null, symbol: string, range: string) {
+  return current?.symbol === symbol.toUpperCase() && current.range === range;
 }
 
 function isAvailable(read: CandleRead | null): read is CandleRead {
@@ -62,7 +67,7 @@ function canPoll(read: CandleRead | null) {
   return Date.now() <= asOf + windowMs + POST_CANDLE_POLL_GRACE_MS;
 }
 
-export function useRiskStoryData(symbol: string, range: string, frame: string) {
+export function useRiskStoryData(symbol: string, range: string, frame: string, trinityRequested = false) {
   const [data, setData] = useState<AppData>({ market: null, trinity: { SPX: null, SPY: null, QQQ: null }, candles: null, flow: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,9 +89,6 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
       marketRead,
       request<CandleRead>(`/api/candles?${candleQuery}`),
       request<FlowRead>(`/api/flow?${query}`),
-      ...(["SPX", "SPY", "QQQ"] as const).map((trinitySymbol) => trinitySymbol === symbol
-        ? marketRead
-        : request<MarketRead>(`/api/market?${new URLSearchParams({ symbol: trinitySymbol, range })}`)),
     ]);
     const value = <T,>(index: number) => results[index].status === "fulfilled" ? results[index].value as T : null;
     const incomingCandles = value<CandleRead>(1);
@@ -97,7 +99,7 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
         ? reconnectingRead(current.candles!)
         : incomingCandles,
       flow: value<FlowRead>(2),
-      trinity: { SPX: value<MarketRead>(3), SPY: value<MarketRead>(4), QQQ: value<MarketRead>(5) },
+      trinity: current.trinity,
     }));
 
     const failed = results.filter((result) => result.status === "rejected");
@@ -109,6 +111,32 @@ export function useRiskStoryData(symbol: string, range: string, frame: string) {
     const timeout = window.setTimeout(() => { void refresh(); }, 0);
     return () => window.clearTimeout(timeout);
   }, [refresh]);
+
+  const loadTrinity = useCallback(async () => {
+    const currentMarket = dataRef.current.market;
+    const selectedRead = sameMarketContext(currentMarket, symbol, range)
+      ? Promise.resolve(currentMarket)
+      : request<MarketRead>(`/api/market?${new URLSearchParams({ symbol, range })}`);
+    const plan = planTrinityReads(symbol, true);
+    const reads = await Promise.allSettled(plan.map(({ symbol: trinitySymbol, reuseSelectedRead }) => reuseSelectedRead
+      ? selectedRead
+      : request<MarketRead>(`/api/market?${new URLSearchParams({ symbol: trinitySymbol, range })}`)));
+    const readFor = (trinitySymbol: typeof TRINITY_SYMBOLS[number]) => {
+      const index = plan.findIndex((item) => item.symbol === trinitySymbol);
+      const result = reads[index];
+      return result?.status === "fulfilled" ? result.value : null;
+    };
+
+    setData((current) => ({
+      ...current,
+      trinity: { SPX: readFor("SPX"), SPY: readFor("SPY"), QQQ: readFor("QQQ") },
+    }));
+  }, [range, symbol]);
+
+  useEffect(() => {
+    if (!trinityRequested) return;
+    void loadTrinity();
+  }, [loadTrinity, trinityRequested]);
 
   const refreshLatestCandles = useCallback(async () => {
     if (pollingRef.current) return;

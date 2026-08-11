@@ -21,7 +21,7 @@ export function RiskStoryApp() {
   const [symbol, setSymbol] = useState("SPY");
   const [range, setRange] = useState("0DTE");
   const [frame, setFrame] = useState("10m");
-  const { data, loading, error, refresh, loadOlderCandles } = useRiskStoryData(symbol || "SPY", range, frame);
+  const { data, loading, error, refresh, loadOlderCandles } = useRiskStoryData(symbol || "SPY", range, frame, view === "trinity");
   const expand = (target: ViewId) => setView(target);
   return <div className="appShell">
     <Sidebar active={view} onChange={setView} />

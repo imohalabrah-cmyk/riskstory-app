@@ -3,7 +3,6 @@ import type {
   FlowRead,
   MarketRead,
 } from "../lib/market/types";
-import type { OpenInterestDashboard } from "../lib/open-interest/types";
 
 export type ViewId =
   | "command"
@@ -22,5 +21,4 @@ export type AppData = {
   trinity: Record<"SPX" | "SPY" | "QQQ", MarketRead | null>;
   candles: CandleRead | null;
   flow: FlowRead | null;
-  openInterest: OpenInterestDashboard | null;
 };

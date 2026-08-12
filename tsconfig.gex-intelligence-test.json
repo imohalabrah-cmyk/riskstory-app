@@ -17,6 +17,7 @@
     "tests/linked-intelligence.test.ts",
     "tests/trinity-read-plan.test.ts",
     "tests/marketdata-observability.test.ts",
+    "tests/unusual-whales-readiness.test.ts",
     "app/lib/gex-intelligence/**/*.ts",
     "app/lib/gex-curve/**/*.ts",
     "app/lib/open-interest-studio/**/*.ts",
@@ -26,6 +27,9 @@
     "app/lib/market/trinity-read-plan.ts",
     "app/lib/market/marketdata-observability.ts",
     "app/lib/market/marketdata-provider.ts",
+    "app/lib/market/unusual-whales-types.ts",
+    "app/lib/market/unusual-whales-provider.ts",
+    "app/lib/market/unusual-whales-capability-probe.ts",
     "app/lib/market/unavailable-provider.ts"
   ]
 }

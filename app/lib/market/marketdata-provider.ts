@@ -1,19 +1,29 @@
 import type { Candle, ExposureProfile, ExposureStrike, FlowRead, MarketDataProvider, MarketLevel, MarketRead, MarketSnapshot } from "./types";
 import { unavailableCandleRead, unavailableFlowRead, unavailableMarketRead } from "./unavailable-provider";
 import { addReportedValues, reportedNonNegative, type ReportedValue } from "./reported-values";
+import { MarketDataUpstreamError, logMarketDataFailure, stageForMarketDataPath } from "./marketdata-observability";
 
 const BASE_URL = "https://api.marketdata.app/v1";
 
 type MarketDataJson = Record<string, unknown>;
+type MarketDataRequestInit = RequestInit & { next?: { revalidate?: number } };
+export type MarketDataFetch = (input: RequestInfo | URL, init?: MarketDataRequestInit) => Promise<Response>;
 
-async function requestJson(path: string): Promise<MarketDataJson> {
+export async function requestMarketDataJson(
+  path: string,
+  request: MarketDataFetch = fetch,
+): Promise<MarketDataJson> {
   const token = process.env.MARKETDATA_TOKEN;
+  const stage = stageForMarketDataPath(path);
 
   if (!token) {
-    throw new Error("MARKETDATA_TOKEN is not configured");
+    throw new MarketDataUpstreamError({
+      stage,
+      message: "MARKETDATA_TOKEN is not configured",
+    });
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await request(`${BASE_URL}${path}`, {
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${token}`,
@@ -22,14 +32,36 @@ async function requestJson(path: string): Promise<MarketDataJson> {
   });
 
   const body = await response.text();
-  const data = (body ? JSON.parse(body) : {}) as MarketDataJson;
+  let data: MarketDataJson = {};
+  try {
+    data = (body ? JSON.parse(body) : {}) as MarketDataJson;
+  } catch {
+    throw new MarketDataUpstreamError({
+      status: response.status,
+      stage,
+      headers: response.headers,
+      message: "MarketData returned a non-JSON response",
+    });
+  }
 
   if (response.status !== 200 && response.status !== 203) {
-    throw new Error(String(data.errmsg || `MarketData request failed with ${response.status}`));
+    throw new MarketDataUpstreamError({
+      status: response.status,
+      code: data.code || data.errorCode || data.s,
+      stage,
+      headers: response.headers,
+      message: data.errmsg || `MarketData request failed with ${response.status}`,
+    });
   }
 
   if (data.s && data.s !== "ok") {
-    throw new Error(String(data.errmsg || data.s));
+    throw new MarketDataUpstreamError({
+      status: response.status,
+      code: data.code || data.errorCode || data.s,
+      stage,
+      headers: response.headers,
+      message: data.errmsg || data.s,
+    });
   }
 
   return data;
@@ -68,7 +100,7 @@ function currentExpirationWindow(expirations: string[]) {
 }
 
 async function requestHeatmapChain(symbol: string) {
-  const expirationRead = await requestJson(`/options/expirations/${encodeURIComponent(symbol)}/`);
+  const expirationRead = await requestMarketDataJson(`/options/expirations/${encodeURIComponent(symbol)}/`);
   const expirationValues = stringArray(expirationRead, "expirations").length
     ? stringArray(expirationRead, "expirations")
     : stringArray(expirationRead, "expiration");
@@ -83,14 +115,14 @@ async function requestHeatmapChain(symbol: string) {
   const basePath = `/options/chain/${encodeURIComponent(symbol)}/?from=${from}&to=${to}&strikeLimit=${HEATMAP_STRIKE_LIMIT}`;
 
   try {
-    const chain = await requestJson(`${basePath}&mode=cached`);
+    const chain = await requestMarketDataJson(`${basePath}&mode=cached`);
     chain._riskStoryHeatmapScope = "cached-current";
     return chain;
   } catch {
     let latestError: unknown = new Error("No accessible historical heatmap session was returned");
     for (const sessionDate of previousMarketSessionDates()) {
       try {
-        const chain = await requestJson(`${basePath}&date=${sessionDate}`);
+        const chain = await requestMarketDataJson(`${basePath}&date=${sessionDate}`);
         chain._riskStoryHeatmapScope = "previous-session";
         chain._riskStorySessionDate = sessionDate;
         return chain;
@@ -233,9 +265,9 @@ async function requestOptionChain(symbol: string, range: string) {
   const dte = rangeToDte(range);
 
   try {
-    return await requestJson(`/options/chain/${encodeURIComponent(symbol)}/?dte=${dte}&strikeLimit=20`);
+    return await requestMarketDataJson(`/options/chain/${encodeURIComponent(symbol)}/?dte=${dte}&strikeLimit=20`);
   } catch (error) {
-    const expirations = await requestJson(`/options/expirations/${encodeURIComponent(symbol)}/`);
+    const expirations = await requestMarketDataJson(`/options/expirations/${encodeURIComponent(symbol)}/`);
     const candidates = stringArray(expirations, "expirations").length
       ? stringArray(expirations, "expirations")
       : stringArray(expirations, "expiration");
@@ -245,7 +277,7 @@ async function requestOptionChain(symbol: string, range: string) {
       throw error;
     }
 
-    return requestJson(`/options/chain/${encodeURIComponent(symbol)}/?expiration=${expiration}&strikeLimit=20`);
+    return requestMarketDataJson(`/options/chain/${encodeURIComponent(symbol)}/?expiration=${expiration}&strikeLimit=20`);
   }
 }
 
@@ -701,10 +733,14 @@ export const marketDataProvider: MarketDataProvider = {
   async getMarketRead({ symbol, range }) {
     try {
       const chain = await requestOptionChain(symbol, range);
-      const quote = await requestJson(`/stocks/quotes/${encodeURIComponent(symbol)}/`).catch(() => ({}));
+      const quote = await requestMarketDataJson(`/stocks/quotes/${encodeURIComponent(symbol)}/`).catch((error) => {
+        logMarketDataFailure(symbol, error);
+        return {};
+      });
 
       return buildMarketRead(symbol, range, quote, chain);
     } catch (error) {
+      logMarketDataFailure(symbol, error);
       return unavailableMarketRead(symbol, range, error instanceof Error ? error.message : "MarketData request failed.");
     }
   },
@@ -719,7 +755,7 @@ export const marketDataProvider: MarketDataProvider = {
       const to = Number.isFinite(before) && before && before > 0 ? Math.floor(before) - 1 : Math.floor(Date.now() / 1000);
       const countback = latest ? 2 : CANDLE_BATCH_SIZE;
       const parameters = new URLSearchParams({ countback: String(countback), to: String(to), extended: "false" });
-      const data = await requestJson(`/stocks/candles/${resolution}/${encodeURIComponent(symbol)}/?${parameters}`);
+      const data = await requestMarketDataJson(`/stocks/candles/${resolution}/${encodeURIComponent(symbol)}/?${parameters}`);
       const candles = parseCandles(data).filter((candle) => !before || candle.time < before);
 
       if (!candles.length) {
@@ -786,6 +822,7 @@ export const marketDataProvider: MarketDataProvider = {
         },
       };
     } catch (error) {
+      logMarketDataFailure(symbol, error);
       return unavailableCandleRead(symbol, frame, error instanceof Error ? error.message : "MarketData candle request failed.");
     }
   },

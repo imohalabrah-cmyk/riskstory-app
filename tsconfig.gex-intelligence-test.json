@@ -16,12 +16,16 @@
     "tests/open-interest-studio.test.ts",
     "tests/linked-intelligence.test.ts",
     "tests/trinity-read-plan.test.ts",
+    "tests/marketdata-observability.test.ts",
     "app/lib/gex-intelligence/**/*.ts",
     "app/lib/gex-curve/**/*.ts",
     "app/lib/open-interest-studio/**/*.ts",
     "app/lib/intelligence/selection-linking.ts",
     "app/lib/market/types.ts",
     "app/lib/market/reported-values.ts",
-    "app/lib/market/trinity-read-plan.ts"
+    "app/lib/market/trinity-read-plan.ts",
+    "app/lib/market/marketdata-observability.ts",
+    "app/lib/market/marketdata-provider.ts",
+    "app/lib/market/unavailable-provider.ts"
   ]
 }

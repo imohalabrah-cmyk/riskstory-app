@@ -13,6 +13,7 @@
     "test:open-interest-studio": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/open-interest-studio.test.js",
     "test:linked-intelligence": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/linked-intelligence.test.js",
     "test:trinity-reads": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/trinity-read-plan.test.js",
+    "test:marketdata-observability": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/marketdata-observability.test.js",
     "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-opennext-worker.mjs",
     "preview": "npm run build:cloudflare && opennextjs-cloudflare preview",
     "deploy": "npm run build:cloudflare && opennextjs-cloudflare deploy",

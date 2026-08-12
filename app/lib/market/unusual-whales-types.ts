@@ -108,6 +108,26 @@ export type UnusualWhalesDarkPoolPriceLevel = {
   regularVolume: number | null;
 };
 
+export type UnusualWhalesCurrentSnapshot = {
+  symbol: string;
+  stockState: UnusualWhalesStockState;
+  optionChain: UnusualWhalesOptionContract[];
+  gexByStrike: UnusualWhalesGreekExposure[];
+  gexByExpiry: UnusualWhalesGreekExposure[];
+  gexLevels: UnusualWhalesGexLevels;
+};
+
+export type UnusualWhalesRawFlowRead = {
+  symbol: string;
+  trades: UnusualWhalesOptionTrade[];
+};
+
+export type UnusualWhalesRawDarkPoolRead = {
+  symbol: string;
+  prints: UnusualWhalesDarkPoolTrade[];
+  priceLevels: UnusualWhalesDarkPoolPriceLevel[];
+};
+
 export type UnusualWhalesCapability =
   | "stock-state"
   | "candles"

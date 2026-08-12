@@ -1,11 +1,14 @@
 import type {
   UnusualWhalesCandle,
+  UnusualWhalesCurrentSnapshot,
   UnusualWhalesDarkPoolPriceLevel,
   UnusualWhalesDarkPoolTrade,
   UnusualWhalesGexLevels,
   UnusualWhalesGreekExposure,
   UnusualWhalesOptionContract,
   UnusualWhalesOptionTrade,
+  UnusualWhalesRawDarkPoolRead,
+  UnusualWhalesRawFlowRead,
   UnusualWhalesStockState,
 } from "./unusual-whales-types";
 
@@ -26,6 +29,10 @@ function stringOrNull(value: unknown) {
 
 function stringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function firstPresent(...values: unknown[]) {
+  return values.find((value) => value !== null && value !== undefined && value !== "") ?? null;
 }
 
 function record(value: unknown): JsonRecord {
@@ -57,7 +64,7 @@ export class UnusualWhalesUpstreamError extends Error {
   }
 }
 
-export class UnusualWhalesClient {
+export class UnusualWhalesProvider {
   constructor(private readonly token: string, private readonly request: UnusualWhalesFetch = fetch) {}
 
   private async get(path: string): Promise<JsonRecord> {
@@ -118,7 +125,35 @@ export class UnusualWhalesClient {
   darkPoolPriceLevels(ticker: string) {
     return this.get(`/darkpool/${encodeURIComponent(ticker)}/price-levels`).then(mapDarkPoolPriceLevels);
   }
+
+  async currentSnapshot(symbol: string): Promise<UnusualWhalesCurrentSnapshot> {
+    const normalized = symbol.toUpperCase();
+    const [stockState, optionChain, gexByStrike, gexByExpiry, gexLevels] = await Promise.all([
+      this.stockState(normalized),
+      this.optionChain(normalized),
+      this.greekExposureByStrike(normalized),
+      this.greekExposureByExpiry(normalized),
+      this.gexLevels(normalized),
+    ]);
+    return { symbol: normalized, stockState, optionChain, gexByStrike, gexByExpiry, gexLevels };
+  }
+
+  async rawFlow(symbol: string): Promise<UnusualWhalesRawFlowRead> {
+    const normalized = symbol.toUpperCase();
+    return { symbol: normalized, trades: await this.optionTrades(normalized) };
+  }
+
+  async rawDarkPool(symbol: string): Promise<UnusualWhalesRawDarkPoolRead> {
+    const normalized = symbol.toUpperCase();
+    const [prints, priceLevels] = await Promise.all([this.darkPoolTrades(normalized), this.darkPoolPriceLevels(normalized)]);
+    return { symbol: normalized, prints, priceLevels };
+  }
 }
+
+// Naming this boundary separately from MarketDataProvider avoids claiming that
+// unverified UW GEX signs already satisfy Risk Story's derived MarketRead model.
+// Compatibility name for the capability-probe boundary.
+export { UnusualWhalesProvider as UnusualWhalesClient };
 
 export function mapStockState(payload: JsonRecord): UnusualWhalesStockState {
   const value = record(payload.data);
@@ -130,11 +165,11 @@ export function mapCandles(payload: JsonRecord): UnusualWhalesCandle[] {
 }
 
 export function mapOptionChain(payload: JsonRecord): UnusualWhalesOptionContract[] {
-  return records(payload.data).map((row) => ({ contract: stringOrNull(row.option_symbol || row.option_chain_id || row.contract), strike: numberOrNull(row.strike), expiry: stringOrNull(row.expiry || row.expires), side: String(row.type || row.option_type || "").toLowerCase() === "call" ? "call" : String(row.type || row.option_type || "").toLowerCase() === "put" ? "put" : null, bid: numberOrNull(row.nbbo_bid || row.bid), ask: numberOrNull(row.nbbo_ask || row.ask), lastPrice: numberOrNull(row.last_price || row.last), openInterest: numberOrNull(row.open_interest), volume: numberOrNull(row.volume), impliedVolatility: numberOrNull(row.implied_volatility), delta: numberOrNull(row.delta), gamma: numberOrNull(row.gamma), theta: numberOrNull(row.theta), vega: numberOrNull(row.vega), rho: numberOrNull(row.rho), lastTapeTime: stringOrNull(row.last_tape_time) }));
+  return records(payload.data).map((row) => ({ contract: stringOrNull(firstPresent(row.option_symbol, row.option_chain_id, row.contract)), strike: numberOrNull(row.strike), expiry: stringOrNull(firstPresent(row.expiry, row.expires)), side: String(firstPresent(row.type, row.option_type) || "").toLowerCase() === "call" ? "call" : String(firstPresent(row.type, row.option_type) || "").toLowerCase() === "put" ? "put" : null, bid: numberOrNull(firstPresent(row.nbbo_bid, row.bid)), ask: numberOrNull(firstPresent(row.nbbo_ask, row.ask)), lastPrice: numberOrNull(firstPresent(row.last_price, row.last)), openInterest: numberOrNull(row.open_interest), volume: numberOrNull(row.volume), impliedVolatility: numberOrNull(row.implied_volatility), delta: numberOrNull(row.delta), gamma: numberOrNull(row.gamma), theta: numberOrNull(row.theta), vega: numberOrNull(row.vega), rho: numberOrNull(row.rho), lastTapeTime: stringOrNull(row.last_tape_time) }));
 }
 
 export function mapGreekExposure(payload: JsonRecord): UnusualWhalesGreekExposure[] {
-  return records(payload.data).map((row) => ({ strike: numberOrNull(row.strike), expiry: stringOrNull(row.expiry), callGex: numberOrNull(row.call_gex || row.call_gamma), putGex: numberOrNull(row.put_gex || row.put_gamma), callDelta: numberOrNull(row.call_delta), putDelta: numberOrNull(row.put_delta), callVanna: numberOrNull(row.call_vanna), putVanna: numberOrNull(row.put_vanna), callCharm: numberOrNull(row.call_charm), putCharm: numberOrNull(row.put_charm) }));
+  return records(payload.data).map((row) => ({ strike: numberOrNull(row.strike), expiry: stringOrNull(row.expiry), callGex: numberOrNull(firstPresent(row.call_gex, row.call_gamma)), putGex: numberOrNull(firstPresent(row.put_gex, row.put_gamma)), callDelta: numberOrNull(row.call_delta), putDelta: numberOrNull(row.put_delta), callVanna: numberOrNull(row.call_vanna), putVanna: numberOrNull(row.put_vanna), callCharm: numberOrNull(row.call_charm), putCharm: numberOrNull(row.put_charm) }));
 }
 
 export function mapGexLevels(payload: JsonRecord): UnusualWhalesGexLevels {
@@ -143,7 +178,7 @@ export function mapGexLevels(payload: JsonRecord): UnusualWhalesGexLevels {
 }
 
 export function mapOptionTrades(payload: JsonRecord): UnusualWhalesOptionTrade[] {
-  return records(payload.data).map((row) => ({ executedAt: stringOrNull(row.executed_at), ticker: stringOrNull(row.ticker || row.underlying_symbol), contract: stringOrNull(row.option_chain_id || row.option_symbol), strike: numberOrNull(row.strike), expiry: stringOrNull(row.expiry), side: String(row.option_type || row.type || "").toLowerCase() === "call" ? "call" : String(row.option_type || row.type || "").toLowerCase() === "put" ? "put" : null, price: numberOrNull(row.price), size: numberOrNull(row.size), premium: numberOrNull(row.premium), openInterest: numberOrNull(row.open_interest), volume: numberOrNull(row.volume), nbboBid: numberOrNull(row.nbbo_bid), nbboAsk: numberOrNull(row.nbbo_ask), impliedVolatility: numberOrNull(row.implied_volatility), delta: numberOrNull(row.delta), gamma: numberOrNull(row.gamma), tags: stringArray(row.tags), reportFlags: stringArray(row.report_flags), exchange: stringOrNull(row.exchange) }));
+  return records(payload.data).map((row) => ({ executedAt: stringOrNull(row.executed_at), ticker: stringOrNull(firstPresent(row.ticker, row.underlying_symbol)), contract: stringOrNull(firstPresent(row.option_chain_id, row.option_symbol)), strike: numberOrNull(row.strike), expiry: stringOrNull(row.expiry), side: String(firstPresent(row.option_type, row.type) || "").toLowerCase() === "call" ? "call" : String(firstPresent(row.option_type, row.type) || "").toLowerCase() === "put" ? "put" : null, price: numberOrNull(row.price), size: numberOrNull(row.size), premium: numberOrNull(row.premium), openInterest: numberOrNull(row.open_interest), volume: numberOrNull(row.volume), nbboBid: numberOrNull(row.nbbo_bid), nbboAsk: numberOrNull(row.nbbo_ask), impliedVolatility: numberOrNull(row.implied_volatility), delta: numberOrNull(row.delta), gamma: numberOrNull(row.gamma), tags: stringArray(row.tags), reportFlags: stringArray(row.report_flags), exchange: stringOrNull(row.exchange) }));
 }
 
 export function mapDarkPoolTrades(payload: JsonRecord): UnusualWhalesDarkPoolTrade[] {

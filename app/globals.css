@@ -422,3 +422,158 @@ select:focus-visible {
 /* Chart Lab visual intelligence: compact terminal hierarchy and quiet overlays. */
 .chartPanel .head { min-height: 54px; background: #0e1622; }.chartPanel .head h2 { color: #f1f6fd; font-size: 15px; }.chartTerminal { border-top: 1px solid rgba(255, 255, 255, .025); background: #090f18; }.chartToolbar { gap: 7px; min-height: 52px; padding: 8px 12px; background: #0d1520; border-bottom-color: rgba(139, 166, 203, .13); }.chartToolbarGroup { border-right-color: rgba(139, 166, 203, .11); }.chartIdentity { color: #f2f7fe; }.chartIdentity strong { font-size: 13px; }.chartIdentity span { color: #7790ad; }.chartTimeframes .toolButton { min-width: 31px; }.toolButton, .iconTool { min-height: 31px; border-radius: 6px; color: #8ea6c1; }.toolButton:hover:not(:disabled), .toolButton:focus-visible, .iconTool:hover:not(:disabled), .iconTool:focus-visible, .toolButton.active, .iconTool.active { border-color: rgba(83, 162, 240, .48); background: rgba(66, 142, 220, .13); color: #f4f9ff; box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }.chartSelect { min-width: 88px; height: 31px; border-color: rgba(139, 166, 203, .18); border-radius: 6px; background: #0a111a; }.chartOhlc { min-height: 30px; padding: 6px 13px; background: #0a111a; border-bottom-color: rgba(139, 166, 203, .09); color: #8299b4; }.chartStage { grid-template-columns: minmax(0, 1fr) 204px; height: clamp(560px, calc(100vh - 196px), 1020px); min-height: 560px; background: #090f18; }.chartCanvas { border-right-color: rgba(139, 166, 203, .11); }.levels { gap: 16px; padding: 20px 16px; background: #0c141f; }.levels > label { color: #9db3cc; letter-spacing: .08em; }.level { gap: 9px; }.level i { height: 2px; border-radius: 0; background: rgba(88, 166, 255, .76); }.level.zero i { background: rgba(214, 174, 75, .78); }.level.put i { background: rgba(239, 106, 118, .78); }.level.spot i { background: rgba(195, 206, 221, .58); }.level b { color: #e8f2fd; font-size: 13px; }.level small { color: #7187a1; text-transform: uppercase; letter-spacing: .05em; }.levelSource { padding-top: 10px; border-top: 1px solid rgba(139, 166, 203, .09); color: #69819b; }.gexBubbleLayer { z-index: 5; overflow: hidden; }.gexBubbleZone { position: absolute; display: inline-flex; align-items: center; gap: 3px; min-width: 0; pointer-events: auto; transform: translateY(-50%); filter: drop-shadow(0 2px 5px rgba(0, 0, 0, .2)); }.gexBubble { position: relative; display: block; flex: 0 0 auto; border: 1px solid color-mix(in srgb, var(--bubble-color) 56%, white); border-radius: 50%; background: color-mix(in srgb, var(--bubble-color) 76%, #111827); box-shadow: inset 0 1px 1px rgba(255,255,255,.24), 0 0 8px color-mix(in srgb, var(--bubble-color) 24%, transparent); opacity: .86; transform: none; transition: opacity .16s ease, transform .16s ease; }.gexBubbleZone:hover .gexBubble { opacity: 1; transform: scale(1.12); }.flowMarker { position: absolute; display: inline-flex; align-items: center; min-height: 18px; padding: 0 6px; border: 1px solid color-mix(in srgb, var(--flow-color) 54%, transparent); border-radius: 4px; background: color-mix(in srgb, var(--flow-color) 14%, #0b121c); color: color-mix(in srgb, var(--flow-color) 78%, white); font-size: 9px; font-weight: 800; font-variant-numeric: tabular-nums; pointer-events: auto; transform: translateY(-50%); box-shadow: 0 3px 12px rgba(0,0,0,.18); }.drawingToolbar { border-color: rgba(139, 166, 203, .19); border-radius: 6px; background: rgba(10, 17, 27, .9); box-shadow: 0 8px 20px rgba(0,0,0,.24); }.chartSettingsModal { background: #101822; border-color: rgba(139, 166, 203, .2); }
 @media (prefers-reduced-motion: reduce) { .toolButton, .iconTool, .gexBubble { transition: none; } }
+
+/* Phase 18B: shared premium workspace language. These tokens are intentionally
+   presentation-only; data state and provider semantics remain in the modules. */
+:root {
+  --rs-surface-0: #080d14;
+  --rs-surface-1: #0b111b;
+  --rs-surface-2: #101824;
+  --rs-surface-3: #151e2b;
+  --rs-border-subtle: rgba(166, 190, 222, .13);
+  --rs-border-quiet: rgba(166, 190, 222, .075);
+  --rs-text-strong: #f4f8fd;
+  --rs-text-secondary: #b6c4d6;
+  --rs-text-muted: #8092a9;
+  --rs-focus: rgba(92, 164, 255, .76);
+  --rs-elevation-1: 0 10px 28px rgba(0, 0, 0, .18), inset 0 1px 0 rgba(255, 255, 255, .018);
+  --rs-elevation-2: 0 18px 48px rgba(0, 0, 0, .24), inset 0 1px 0 rgba(255, 255, 255, .024);
+  --rs-control-radius: 7px;
+  --rs-motion-fast: 130ms ease;
+}
+
+body { background: var(--rs-surface-0); }
+.top, .rail { background: color-mix(in srgb, var(--rs-surface-0) 94%, transparent); border-color: var(--rs-border-subtle); }
+.workspace { padding: clamp(12px, 1.4vw, 22px); }
+.panel, .stat, .gexStudioSelector, .gexStudioWorkspace, .oiToolbox, .oiInspector, .oiWorkspaceSurface, .oiDetails, .storyHero, .storyEvidence > article, .storyLevels, .storyExplore {
+  border-color: var(--rs-border-subtle);
+  background: var(--rs-surface-2);
+  box-shadow: var(--rs-elevation-1);
+}
+.head, .chartToolbar, .heatControls, .gexToolbar { border-color: var(--rs-border-quiet); background: color-mix(in srgb, var(--rs-surface-2) 94%, black); }
+.head h2, .gexTitleBar h2, .oiStudioHero h2, .storyIntro h2 { color: var(--rs-text-strong); letter-spacing: 0; }
+.panel .head h2 { font-size: 13px; }
+button, select, input { transition: border-color var(--rs-motion-fast), background-color var(--rs-motion-fast), color var(--rs-motion-fast), box-shadow var(--rs-motion-fast), transform var(--rs-motion-fast); }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--rs-focus); outline-offset: 2px; }
+
+/* Command Center: a compact executive read, then the working surfaces. */
+.commandBrief { grid-column: 1 / -1; display: grid; gap: 14px; min-width: 0; padding: clamp(16px, 1.7vw, 24px); border: 1px solid var(--rs-border-subtle); border-radius: var(--rs-radius); background: var(--rs-surface-2); box-shadow: var(--rs-elevation-1); }
+.commandBrief > header { display: flex; align-items: end; justify-content: space-between; gap: 18px; }
+.commandBrief > header span, .commandBriefStatus small { color: var(--rs-cyan); font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.commandBrief h2 { margin: 5px 0 4px; color: var(--rs-text-strong); font-size: clamp(20px, 1.9vw, 29px); }
+.commandBrief p { max-width: 70ch; margin: 0; color: var(--rs-text-muted); font-size: 12px; line-height: 1.5; }
+.commandBriefStatus { min-width: 150px; display: grid; gap: 5px; padding: 10px 12px; border-left: 1px solid var(--rs-border-subtle); text-align: right; }
+.commandBriefStatus strong { color: var(--rs-text-secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+.commandBrief .stats { overflow: visible; padding: 0; }
+.commandBrief .stat { min-height: 94px; border-color: var(--rs-border-quiet); border-radius: var(--rs-radius-sm); background: var(--rs-surface-1); box-shadow: none; }
+.commandBrief .stat:hover { border-color: rgba(96, 166, 255, .32); background: var(--rs-surface-3); }
+
+/* Shared control density keeps each workspace inside the same product rhythm. */
+.heatControl select, .chartSelect, .oiToolbox select, .gexSegments, .heatSegment, .heatReset, .gexReset, .toolButton, .iconTool { border-color: var(--rs-border-subtle); border-radius: var(--rs-control-radius); background: var(--rs-surface-1); }
+.heatSegment button.active, .gexSegments button.active, .toolButton.active, .iconTool.active { box-shadow: inset 0 0 0 1px rgba(94, 167, 255, .24); }
+.heatSummary, .heatUtility, .heatFooter, .gexScope, .oiDetails, .storyNotice { border-color: var(--rs-border-quiet); background: color-mix(in srgb, var(--rs-surface-1) 80%, transparent); }
+
+/* Chart remains a terminal surface: more contrast at the levels edge, less visual noise elsewhere. */
+.chartPanel .head, .chartToolbar, .chartOhlc, .chartStage { background: var(--rs-surface-1); }
+.chartStage { border-top-color: var(--rs-border-quiet); }
+.levels { background: var(--rs-surface-2); }
+.levels > label { color: var(--rs-text-muted); }
+.level b { color: var(--rs-text-strong); }
+.gexBubbleZone { filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .28)); }
+.gexBubble { box-shadow: inset 0 1px 1px rgba(255,255,255,.2), 0 0 10px color-mix(in srgb, var(--bubble-color) 18%, transparent); }
+.flowMarker { box-shadow: 0 4px 14px rgba(0,0,0,.2); }
+.chartSettingsModal { box-shadow: var(--rs-elevation-2); }
+
+/* GEX Studio: one calm workspace around a changing lens, not four unrelated charts. */
+.gexIntelligence { max-width: 1800px; margin: 0 auto; }
+.gexTitleBar { border-color: var(--rs-border-subtle); background: var(--rs-surface-2); box-shadow: var(--rs-elevation-1); }
+.gexTitleBar > div > p, .gexScope { color: var(--rs-text-muted); }
+.gexStudioSelector { box-shadow: none; background: var(--rs-surface-1); }
+.gexVisualizationList button { border-radius: var(--rs-control-radius); }
+.gexVisualizationList button:hover, .gexVisualizationList button.active { background: rgba(69, 142, 235, .1); }
+.gexMapPanel, .gexDetailPanel, .gexSidePanel > section { border-color: var(--rs-border-subtle); background: var(--rs-surface-1); box-shadow: none; }
+.gexMapPanel > header { border-color: var(--rs-border-quiet); }
+.gexMapLegend { color: var(--rs-text-muted); }
+.gexMapRow:hover, .gexMapRow.selected { background: rgba(77, 150, 247, .09); }
+.gexProfile, .gexHistogram, .gexHeatmap { background: var(--rs-surface-1); }
+.gexHeatmapGrid { border-color: var(--rs-border-quiet); }
+.gexHeatmapHead, .gexHeatmapStrike, .gexHeatmapCell { border-color: var(--rs-border-quiet); }
+
+/* Heatmap Matrix: strike and spot stay legible while density remains an explicit control. */
+.heatmapIntelligence { background: var(--rs-surface-2); }
+.heatViewport { background: var(--rs-surface-1); }
+.heatHeader > div { background: var(--rs-surface-3); border-color: var(--rs-border-subtle); }
+.heatHeader > div:first-child, .heatRow > strong { background: var(--rs-surface-2); }
+.heatRow > strong { color: #b6d9ff; }
+.heatCell { border-color: var(--rs-border-quiet); }
+.heatCell:hover, .heatCell.hovered, .heatCell:focus-visible { box-shadow: inset 0 0 0 1px rgba(120, 193, 255, .38); }
+.heatSummary b { color: #a8d4ff; }
+
+/* Open Interest is intentionally simpler: direct call/put comparison first, raw context second. */
+.oiStudio { max-width: 1800px; margin: 0 auto; gap: 16px; }
+.oiStudioHero { border-color: var(--rs-border-subtle); background: var(--rs-surface-2); box-shadow: var(--rs-elevation-1); }
+.oiToolbox, .oiInspector { background: var(--rs-surface-1); box-shadow: none; }
+.oiWorkspaceSurface { background: var(--rs-surface-1); }
+.oiProfileRow.prominent { background: rgba(92, 164, 255, .065); box-shadow: inset 3px 0 0 rgba(92, 164, 255, .72); }
+.oiProfileRow.prominent .oiProfileMeasure b { color: var(--rs-text-secondary); }
+.oiReportedContext { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--rs-border-quiet); }
+.oiReportedContext > span, .oiReportedContext > p { grid-column: 1 / -1; padding: 12px 14px 0; color: var(--rs-text-muted); font-size: 9px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.oiReportedContext > p { margin: 0; padding-top: 5px; padding-bottom: 12px; font-size: 10px; font-weight: 500; letter-spacing: 0; text-transform: none; line-height: 1.45; }
+.oiReportedContext > div { display: grid; gap: 4px; padding: 12px 14px; border-top: 1px solid var(--rs-border-quiet); }
+.oiReportedContext > div + div { border-left: 1px solid var(--rs-border-quiet); }
+.oiReportedContext small { color: var(--rs-text-muted); font-size: 9px; text-transform: uppercase; }
+.oiReportedContext b { color: var(--rs-text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+/* Story now carries a readable sequence: what matters, why, then what to watch. */
+.marketStory { max-width: 1800px; margin: 0 auto; }
+.storyHero, .storyEvidence > article, .storyLevels, .storyExplore, .storyWatch { border: 1px solid var(--rs-border-subtle); border-radius: var(--rs-radius); background: var(--rs-surface-2); box-shadow: var(--rs-elevation-1); }
+.storyHero { box-shadow: var(--rs-elevation-2); }
+.storyHero .storyFocus { border-top-color: var(--rs-border-quiet); }
+.storyFocusGrid > button:first-child { background: color-mix(in srgb, var(--rs-surface-3) 76%, var(--rs-blue)); }
+.storyFocusGrid > button:hover, .storyFocusGrid > button.selected { background: rgba(78, 148, 240, .12); }
+.storyContext { opacity: .9; }
+.storyWatch { overflow: hidden; }
+.storyWatch > header { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--rs-border-quiet); }
+.storyWatch > header > span { color: var(--rs-cyan); font-size: 11px; font-weight: 800; }
+.storyWatch header small { color: var(--rs-text-muted); font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.storyWatch h3 { margin: 2px 0 0; color: var(--rs-text-strong); font-size: 14px; }
+.storyWatch header p { margin: 0 0 0 auto; max-width: 42ch; color: var(--rs-text-muted); font-size: 10px; text-align: right; }
+.storyWatch > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.storyWatch article { display: grid; gap: 4px; min-height: 84px; padding: 14px 16px; border-right: 1px solid var(--rs-border-quiet); }
+.storyWatch article:last-child { border-right: 0; }
+.storyWatch article small, .storyWatch article span { color: var(--rs-text-muted); font-size: 10px; }
+.storyWatch article strong { color: var(--rs-text-strong); font-size: 18px; font-variant-numeric: tabular-nums; }
+.storyWatch article.unavailable { grid-column: 1 / -1; }
+.storySkeletonWatch > div { min-height: 84px; display: grid; align-content: center; gap: 10px; padding: 14px 16px; }
+
+/* Trinity keeps its comparison workspace and makes partial provider coverage explicit. */
+.trinityPanel { background: var(--rs-surface-2); }
+.trinitySummary { border-color: var(--rs-border-quiet); background: var(--rs-surface-1); }
+.trinityGrid { gap: 12px; padding: 12px; }
+.trinityCard { border-color: var(--rs-border-subtle); background: var(--rs-surface-1); }
+.trinityCard:hover { border-color: rgba(98, 171, 250, .3); }
+
+@media (max-width: 980px) {
+  .commandBrief > header { align-items: start; flex-direction: column; }
+  .commandBriefStatus { width: 100%; min-width: 0; border-top: 1px solid var(--rs-border-quiet); border-left: 0; text-align: left; }
+  .oiStudioLayout { grid-template-columns: 150px minmax(0, 1fr); }
+  .oiInspector { grid-column: 1 / -1; position: static; }
+  .storyWatch header p { display: none; }
+}
+@media (max-width: 680px) {
+  .workspace { padding: 10px; }
+  .commandBrief { padding: 14px; }
+  .commandBrief .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; }
+  .commandBrief .stat { min-width: 0; }
+  .oiStudioLayout { grid-template-columns: 1fr; }
+  .oiToolbox { position: static; grid-template-columns: 1fr 1fr; align-items: center; }
+  .oiToolbox > span, .oiToolbox label, .oiToolbox small { grid-column: 1 / -1; }
+  .oiInspector { grid-column: auto; }
+  .storyWatch > header { align-items: start; }
+  .storyWatch > div { grid-template-columns: 1fr; }
+  .storyWatch article { border-right: 0; border-bottom: 1px solid var(--rs-border-quiet); }
+  .storyWatch article:last-child { border-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 1ms !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; }
+}

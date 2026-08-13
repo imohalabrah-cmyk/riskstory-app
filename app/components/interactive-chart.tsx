@@ -140,7 +140,7 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
           size,
           count: row.bubbleCount,
           color: row.netGex >= 0 ? (row.intensity > .75 ? CHART_COLORS.gexStrong : CHART_COLORS.gexPositive) : CHART_COLORS.gexNegative,
-          label: `Current GEX zone. Strike ${row.strike.toLocaleString("en-US")}. GEX ${row.netGex.toLocaleString("en-US")}. Call OI ${row.callOpenInterest ?? "N/A"}. Put OI ${row.putOpenInterest ?? "N/A"}. Call volume ${row.callVolume ?? "N/A"}. Put volume ${row.putVolume ?? "N/A"}.`,
+          label: `Current GEX zone. Strike ${row.strike.toLocaleString("en-US")}. GEX ${row.netGex.toLocaleString("en-US")}. Call OI ${row.callOpenInterest ?? "N/A"}. Put OI ${row.putOpenInterest ?? "N/A"}. Call volume ${row.callVolume ?? "N/A"}. Put volume ${row.putVolume ?? "N/A"}. ${row.horizon.label}: ${row.horizon.detail}`,
         }];
       });
       setBubbles((current) => sameBubbleLayout(current, next) ? current : next);

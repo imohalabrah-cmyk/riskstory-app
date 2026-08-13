@@ -4,15 +4,15 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, ChartCandlestick, CircleAlert, Compass, Info, Network, TableProperties } from "lucide-react";
 import { analyzeGexIntelligence } from "../lib/gex-intelligence";
 import type { GexLevelAssessment, IntelligenceScore, LiquidityVacuumInterval } from "../lib/gex-intelligence";
-import type { MarketRead } from "../lib/market/types";
+import type { FlowRead, MarketRead } from "../lib/market/types";
 import type { ViewId } from "./types";
-import { classNames, price } from "./utils";
+import { classNames, money, price } from "./utils";
 
 type FocusItem =
   | { id: string; kind: "level"; label: string; level: GexLevelAssessment; score: number | null; reason: string }
   | { id: string; kind: "interval"; label: string; interval: LiquidityVacuumInterval; score: number; reason: string };
 
-type Props = { market: MarketRead | null; onNavigate: (view: ViewId) => void };
+type Props = { market: MarketRead | null; flow: FlowRead | null; onNavigate: (view: ViewId) => void };
 
 function scoreValue(read: IntelligenceScore) {
   return read.availability === "available" ? read.score : null;
@@ -90,7 +90,8 @@ function StoryUnavailable({ onNavigate }: Pick<Props, "onNavigate">) {
       <article><header><span>03</span><div><small>Market Context</small><h3>Current structure</h3></div></header><div className="storyContextSkeleton">{Array.from({ length: 4 }, (_, index) => <SkeletonLine key={index} />)}</div></article>
     </section>
 
-    <section className="storyLevels storySkeletonLevels" aria-busy="true"><header><div><span>04</span><div><small>Key Levels</small><h3>Engine-ranked structure</h3></div></div><p>No level values are shown without provider data.</p></header>{Array.from({ length: 4 }, (_, index) => <div key={index}><SkeletonLine short /><SkeletonLine /><SkeletonLine short /></div>)}</section>
+    <section className="storyWatch storySkeletonWatch" aria-busy="true"><header><span>04</span><div><small>Watch</small><h3>Provider context</h3></div></header><div><SkeletonLine /><SkeletonLine short /></div></section>
+    <section className="storyLevels storySkeletonLevels" aria-busy="true"><header><div><span>05</span><div><small>Key Levels</small><h3>Engine-ranked structure</h3></div></div><p>No level values are shown without provider data.</p></header>{Array.from({ length: 4 }, (_, index) => <div key={index}><SkeletonLine short /><SkeletonLine /><SkeletonLine short /></div>)}</section>
 
     <StoryExplore onNavigate={onNavigate} />
   </section>;
@@ -108,12 +109,22 @@ function StoryExplore({ onNavigate }: Pick<Props, "onNavigate">) {
   </section>;
 }
 
-export function MarketStoryPanel({ market, onNavigate }: Props) {
+export function MarketStoryPanel({ market, flow, onNavigate }: Props) {
   const availableMarket = market && market.provenance.mode !== "unavailable" && market.exposure?.rows.length ? market : null;
   const intelligence = useMemo(() => availableMarket ? analyzeGexIntelligence(availableMarket) : null, [availableMarket]);
   const focus = useMemo(() => intelligence?.availability === "available" ? makeFocus(intelligence.levels, intelligence.liquidityVacuum.intervals) : [], [intelligence]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = focus.find((item) => item.id === selectedId) ?? focus[0] ?? null;
+  const watch = useMemo(() => {
+    const darkPoolLevels = (flow?.raw?.darkPoolPriceLevels ?? []).flatMap((item) => item.price !== null && item.darkPoolVolume !== null ? [{ price: item.price, volume: item.darkPoolVolume }] : []).sort((left, right) => right.volume - left.volume);
+    const flowTrades = (flow?.raw?.optionTrades ?? []).flatMap((item) => item.strike !== null && item.premium !== null ? [{ strike: item.strike, premium: item.premium, side: item.side }] : []).sort((left, right) => right.premium - left.premium);
+    const topDarkPool = darkPoolLevels[0] ?? null;
+    const topFlow = flowTrades[0] ?? null;
+    return [
+      topDarkPool ? { label: "Dark Pool", value: price(topDarkPool.price), detail: `${topDarkPool.volume.toLocaleString()} reported dark-pool volume` } : null,
+      topFlow ? { label: "Options Flow", value: money(topFlow.premium), detail: `${topFlow.side ? `${topFlow.side} ` : ""}trade at ${price(topFlow.strike)}` } : null,
+    ].filter((item): item is { label: string; value: string; detail: string } => item !== null);
+  }, [flow]);
 
   if (!availableMarket || !intelligence || intelligence.availability === "unavailable" || !focus.length) {
     return <StoryUnavailable onNavigate={onNavigate} />;
@@ -144,8 +155,13 @@ export function MarketStoryPanel({ market, onNavigate }: Props) {
       <article className="storyContext"><header><span>03</span><div><small>Market Context</small><h3>Evidence, not the headline</h3></div></header><div>{context.map((item) => <section key={item.label}><small>{item.label}</small><strong>{item.available ? typeof item.value === "number" ? `${item.value}/100` : item.value : "N/A"}</strong><span>{item.available ? item.detail : "Unavailable"}</span></section>)}</div></article>
     </section>
 
+    <section className="storyWatch" aria-label="Current provider context">
+      <header><span>04</span><div><small>Watch</small><h3>Reported market context</h3></div><p>Raw provider context only. It is not a directional signal.</p></header>
+      <div>{watch.length ? watch.map((item) => <article key={item.label}><small>{item.label}</small><strong>{item.value}</strong><span>{item.detail}</span></article>) : <article className="unavailable"><small>Context</small><strong>N/A</strong><span>No provider-backed Flow or Dark Pool item is currently available.</span></article>}</div>
+    </section>
+
     <section className="storyLevels" aria-label="Key Levels">
-      <header><div><span>04</span><div><small>Key Levels</small><h3>Engine-ranked structure</h3></div></div><p>Top current levels from GEX Intelligence. No additional UI ranking is applied.</p></header>
+      <header><div><span>05</span><div><small>Key Levels</small><h3>Engine-ranked structure</h3></div></div><p>Top current levels from GEX Intelligence. No additional UI ranking is applied.</p></header>
       <div className="storyLevelRows">{intelligence.levels.slice(0, 5).map((level, index) => <button type="button" key={level.strike} className={classNames(selected?.kind === "level" && selected.level.strike === level.strike && "selected")} onClick={() => setSelectedId(`level-${level.strike}`)}><span>0{index + 1}</span><strong>{price(level.strike)}</strong><small>{labelForLevel(level)}</small><b>{scoreValue(level.levelStrength) ?? "N/A"}</b><em>{scoreValue(level.confluence) ?? "N/A"}</em></button>)}</div>
     </section>
 

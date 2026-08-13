@@ -27,6 +27,7 @@ function maximumReported(rows: OpenInterestStudioRow[]) {
 
 function OpenInterestProfile({ rows, spot, selectedStrike, onSelect }: { rows: OpenInterestStudioRow[]; spot: number | null; selectedStrike: number | null; onSelect: (strike: number) => void }) {
   const maximum = useMemo(() => maximumReported(rows), [rows]);
+  const maximumCombined = useMemo(() => Math.max(1, ...rows.flatMap((row) => row.combinedOpenInterest === null ? [] : [row.combinedOpenInterest])), [rows]);
   const spotStrike = useMemo(() => closestOpenInterestStrike(rows, spot), [rows, spot]);
   return <div className="oiProfile" role="list" aria-label="Call and put open interest profile by strike">
     <div className="oiProfileHead"><span>Call OI</span><span>Strike</span><span>Put OI</span></div>
@@ -35,7 +36,8 @@ function OpenInterestProfile({ rows, spot, selectedStrike, onSelect }: { rows: O
       const nearSpot = row.strike === spotStrike;
       const callWidth = row.callOpenInterest === null ? 0 : row.callOpenInterest / maximum * 100;
       const putWidth = row.putOpenInterest === null ? 0 : row.putOpenInterest / maximum * 100;
-      return <button key={row.strike} type="button" className={classNames("oiProfileRow", selected && "selected", nearSpot && "nearSpot")} onClick={() => onSelect(row.strike)} aria-pressed={selected}>
+      const prominent = row.combinedOpenInterest !== null && row.combinedOpenInterest / maximumCombined >= .72;
+      return <button key={row.strike} type="button" className={classNames("oiProfileRow", selected && "selected", nearSpot && "nearSpot", prominent && "prominent")} onClick={() => onSelect(row.strike)} aria-pressed={selected} title={prominent ? "High reported combined open interest at this strike" : "Reported open interest at this strike"}>
         <span className="oiProfileMeasure calls"><i style={{ width: `${callWidth}%` }} /><b>{contracts(row.callOpenInterest)}</b></span>
         <strong>{price(row.strike)}{nearSpot && <small>near spot</small>}</strong>
         <span className="oiProfileMeasure puts"><b>{contracts(row.putOpenInterest)}</b><i style={{ width: `${putWidth}%` }} /></span>
@@ -59,6 +61,7 @@ export function OpenInterestPanel({ market }: Props) {
   const rows = useMemo(() => read ? openInterestRowsForExpiration(read, activeExpiration) : [], [activeExpiration, read]);
   const linkedStrike = useMemo(() => resolveLinkedStrike(selection, { symbol: read?.symbol, strikes: rows.map((row) => row.strike), expiration: activeExpiration }), [activeExpiration, read?.symbol, rows, selection]);
   const selectedRow = useMemo(() => findOpenInterestRow(rows, linkedStrike ?? selectedStrike) ?? rows[0] ?? null, [linkedStrike, rows, selectedStrike]);
+  const selectedExposure = useMemo(() => selectedRow ? market?.exposure?.rows.find((row) => row.strike === selectedRow.strike) ?? null : null, [market?.exposure?.rows, selectedRow]);
 
   const selectStrike = (strike: number) => {
     setSelectedStrike(strike);
@@ -78,10 +81,10 @@ export function OpenInterestPanel({ market }: Props) {
 
       <div className="oiWorkspace" id="open-interest-workspace">
         <section className="oiWorkspaceSurface"><header><div><span>{view === "profile" ? "PROFILE" : "LADDER"}</span><h3>{view === "profile" ? "Call and put open interest by strike" : "Actual option-chain open interest"}</h3></div><div className="oiWorkspaceMeta"><span>Expiration</span><strong>{activeExpiration || "N/A"}</strong></div></header>{unavailable ? <div className="surfaceEmpty oiUnavailable"><strong>Open-interest data unavailable</strong><span>A provider-backed option-chain expiration is required to populate this workspace.</span></div> : view === "profile" ? <OpenInterestProfile rows={rows} spot={read!.spot} selectedStrike={selectedRow?.strike ?? null} onSelect={selectStrike} /> : <OpenInterestLadder rows={rows} spot={read!.spot} selectedStrike={selectedRow?.strike ?? null} onSelect={selectStrike} />}</section>
-        <section className="oiDetails"><span>Details</span><p>Click a real strike to inspect its reported open interest and volume. `N/A` means the provider did not report that field.</p></section>
+        <section className="oiDetails"><span>Details</span><p>Brighter profile rows mark high reported combined OI in this expiration. Click a real strike to inspect its reported context. `N/A` means the provider did not report that field.</p></section>
       </div>
 
-      <aside className="oiInspector" aria-live="polite"><header><div className="oiInspectorHeading"><span>Selected level</span>{linkedStrike !== null && <button type="button" className="oiClearSelection" onClick={clearLocalSelection}>Clear</button>}</div><h3>{selectedRow ? price(selectedRow.strike) : "Unavailable"}</h3><small>{selectedRow ? distanceFromSpot(selectedRow.strike, read?.spot ?? null) : "Provider-backed strike required"}</small></header>{selectedRow ? <dl><div><dt>Expiration</dt><dd>{selectedRow.expiration}</dd></div><div><dt>Call OI</dt><dd>{contracts(selectedRow.callOpenInterest)}</dd></div><div><dt>Put OI</dt><dd>{contracts(selectedRow.putOpenInterest)}</dd></div><div><dt>Combined OI</dt><dd>{contracts(selectedRow.combinedOpenInterest)}</dd></div><div><dt>Call volume</dt><dd>{contracts(selectedRow.callVolume)}</dd></div><div><dt>Put volume</dt><dd>{contracts(selectedRow.putVolume)}</dd></div><div><dt>Combined volume</dt><dd>{contracts(selectedRow.combinedVolume)}</dd></div></dl> : <div className="oiInspectorEmpty">No provider-backed strike is available to inspect.</div>}</aside>
+      <aside className="oiInspector" aria-live="polite"><header><div className="oiInspectorHeading"><span>Selected level</span>{linkedStrike !== null && <button type="button" className="oiClearSelection" onClick={clearLocalSelection}>Clear</button>}</div><h3>{selectedRow ? price(selectedRow.strike) : "Unavailable"}</h3><small>{selectedRow ? distanceFromSpot(selectedRow.strike, read?.spot ?? null) : "Provider-backed strike required"}</small></header>{selectedRow ? <><dl><div><dt>Expiration</dt><dd>{selectedRow.expiration}</dd></div><div><dt>Call OI</dt><dd>{contracts(selectedRow.callOpenInterest)}</dd></div><div><dt>Put OI</dt><dd>{contracts(selectedRow.putOpenInterest)}</dd></div><div><dt>Combined OI</dt><dd>{contracts(selectedRow.combinedOpenInterest)}</dd></div><div><dt>Call volume</dt><dd>{contracts(selectedRow.callVolume)}</dd></div><div><dt>Put volume</dt><dd>{contracts(selectedRow.putVolume)}</dd></div><div><dt>Combined volume</dt><dd>{contracts(selectedRow.combinedVolume)}</dd></div></dl><section className="oiReportedContext"><span>Reported context</span><p>OI, volume, and GEX are shown independently; this is context, not a price forecast.</p><div><small>Call GEX</small><b>{selectedExposure ? selectedExposure.callGex.toLocaleString() : "N/A"}</b></div><div><small>Put GEX</small><b>{selectedExposure ? selectedExposure.putGex.toLocaleString() : "N/A"}</b></div></section></> : <div className="oiInspectorEmpty">No provider-backed strike is available to inspect.</div>}</aside>
     </div>
   </section>;
 }

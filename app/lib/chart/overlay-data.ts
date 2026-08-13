@@ -1,5 +1,6 @@
 import { combineReportedValues } from "../market/reported-values";
 import type { ExposureStrike, FlowRead, MarketRead } from "../market/types";
+import { describeExposureHorizon, type ExposureHorizon } from "./exposure-horizon";
 
 export type GexZone = {
   strike: number;
@@ -11,6 +12,7 @@ export type GexZone = {
   score: number;
   bubbleCount: number;
   intensity: number;
+  horizon: ExposureHorizon;
 };
 
 export type DarkPoolZone = {
@@ -49,6 +51,7 @@ export function selectGexZones(market: MarketRead, limitPerSide = 3): GexZone[] 
     .filter((row): row is ExposureStrike => Number.isFinite(row.strike) && Number.isFinite(row.netGex) && Math.abs(row.netGex) > 0 && Math.abs(row.strike - spot) <= horizon);
   const maximumGex = Math.max(...candidates.map((row) => Math.abs(row.netGex)), 1);
   const maximumOi = Math.max(...candidates.map((row) => combineReportedValues(row.callOpenInterest, row.putOpenInterest) ?? 0), 1);
+  const horizonMetadata = describeExposureHorizon(market);
   const ranked = candidates.map((row) => {
     const magnitude = normalized(Math.abs(row.netGex), maximumGex);
     const interest = normalized(combineReportedValues(row.callOpenInterest, row.putOpenInterest) ?? 0, maximumOi);
@@ -70,6 +73,7 @@ export function selectGexZones(market: MarketRead, limitPerSide = 3): GexZone[] 
       score,
       intensity: magnitude,
       bubbleCount: Math.max(2, Math.min(8, Math.round(2 + magnitude * 6))),
+      horizon: horizonMetadata,
     }));
 }
 

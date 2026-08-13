@@ -1,6 +1,7 @@
 import { marketDataProvider } from "./marketdata-provider";
 import { unavailableProvider } from "./unavailable-provider";
 import { UnusualWhalesProvider } from "./unusual-whales-provider";
+import { UnusualWhalesMarketProvider } from "./unusual-whales-market-provider";
 
 export type MarketProviderSelection = "marketdata" | "unusual-whales" | "unavailable";
 
@@ -21,9 +22,13 @@ export function resolveMarketProviderSelection(environment: ServerEnvironment = 
 }
 
 export function getMarketProvider() {
-  // UW remains dormant in Phase 16C. This explicit branch makes the future
-  // activation gate observable without changing today's production provider.
-  return resolveMarketProviderSelection() === "marketdata" ? marketDataProvider : unavailableProvider;
+  const selection = resolveMarketProviderSelection();
+  if (selection === "marketdata") return marketDataProvider;
+  if (selection === "unusual-whales") {
+    const provider = getUnusualWhalesProvider();
+    return provider ? new UnusualWhalesMarketProvider(provider) : unavailableProvider;
+  }
+  return unavailableProvider;
 }
 
 /** Server-only factory for an explicit future UW capability probe/integration. */

@@ -1,5 +1,5 @@
 import { combineReportedValues } from "../market/reported-values";
-import type { ExposureStrike, MarketRead } from "../market/types";
+import type { ExpirationExposureStrike, MarketRead } from "../market/types";
 
 export type OpenInterestStudioRow = {
   strike: number;
@@ -23,7 +23,7 @@ function isUsableStrike(value: number) {
   return Number.isFinite(value) && value > 0;
 }
 
-function studioRow(row: ExposureStrike, expiration: string): OpenInterestStudioRow | null {
+function studioRow(row: ExpirationExposureStrike, expiration: string): OpenInterestStudioRow | null {
   if (!isUsableStrike(row.strike)) return null;
   return {
     strike: row.strike,

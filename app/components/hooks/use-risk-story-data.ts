@@ -60,7 +60,7 @@ function frameWindowMs(frame: string) {
 }
 
 function canPoll(read: CandleRead | null) {
-  if (!isAvailable(read) || read.provider !== "marketdata" || read.connection?.state === "unavailable") return false;
+  if (!isAvailable(read) || !["marketdata", "unusual-whales"].includes(read.provider) || read.connection?.state === "unavailable") return false;
   const asOf = read.provenance.asOf ? new Date(read.provenance.asOf).getTime() : Number.NaN;
   const windowMs = frameWindowMs(read.frame);
   if (!Number.isFinite(asOf) || !windowMs) return false;

@@ -76,6 +76,16 @@ export type ExposureStrike = {
   combined: number;
 };
 
+/**
+ * An expiration-specific option-chain row. UW currently reports GEX by
+ * strike and by expiry separately, not as a strike-by-expiry matrix, so this
+ * shape intentionally carries only the fields that are actually scoped to an
+ * expiration.
+ */
+export type ExpirationExposureStrike = Pick<ExposureStrike,
+  "strike" | "callOpenInterest" | "putOpenInterest" | "callVolume" | "putVolume"
+>;
+
 export type ExposureProfile = {
   method: "chain-greeks-v1";
   assumption: string;
@@ -84,7 +94,12 @@ export type ExposureProfile = {
   rows: ExposureStrike[];
   expirations: Array<{
     expiration: string;
-    rows: ExposureStrike[];
+    rows: ExpirationExposureStrike[];
+  }>;
+  providerNativeGexByExpiration?: Array<{
+    expiration: string;
+    callGex: number | null;
+    putGex: number | null;
   }>;
 };
 
@@ -100,6 +115,22 @@ export type MarketRead = {
   snapshot: MarketSnapshot;
   levels: MarketLevel[];
   exposure?: ExposureProfile;
+  optionChain?: {
+    contracts: Array<{
+      contract: string | null;
+      strike: number | null;
+      expiration: string | null;
+      side: "call" | "put" | null;
+      bid: number | null;
+      ask: number | null;
+      lastPrice: number | null;
+      openInterest: number | null;
+      volume: number | null;
+      impliedVolatility: number | null;
+      delta: number | null;
+      gamma: number | null;
+    }>;
+  };
 };
 
 export type Candle = {
@@ -155,6 +186,36 @@ export type FlowRead = {
   provenance: DataProvenance;
   quality: DataQuality;
   rows: FlowRow[];
+  raw?: {
+    optionTrades: Array<{
+      executedAt: string | null;
+      ticker: string | null;
+      strike: number | null;
+      expiry: string | null;
+      side: "call" | "put" | null;
+      price: number | null;
+      size: number | null;
+      premium: number | null;
+      openInterest: number | null;
+      volume: number | null;
+      nbboBid: number | null;
+      nbboAsk: number | null;
+      tags: string[];
+    }>;
+    darkPoolPrints: Array<{
+      executedAt: string | null;
+      ticker: string | null;
+      price: number | null;
+      size: number | null;
+      premium: number | null;
+      marketCenter: string | null;
+    }>;
+    darkPoolPriceLevels: Array<{
+      price: number | null;
+      darkPoolVolume: number | null;
+      regularVolume: number | null;
+    }>;
+  };
 };
 
 export type MarketDataProvider = {

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { runUnusualWhalesCapabilityProbe, unusualWhalesProbePlan } from "../app/lib/market/unusual-whales-capability-probe";
+import { getUnusualWhalesCapabilityProbeResponse, isUnusualWhalesCapabilityProbeEnabled } from "../app/lib/market/unusual-whales-capability-endpoint";
 import { mapCandles, mapDarkPoolPriceLevels, mapDarkPoolTrades, mapGexLevels, mapGreekExposure, mapOptionChain, mapOptionTrades, mapStockState, UnusualWhalesClient } from "../app/lib/market/unusual-whales-provider";
 import { getUnusualWhalesProvider, resolveMarketProviderSelection } from "../app/lib/market/provider";
 
@@ -49,4 +50,54 @@ test("UW activation requires explicit server-side provider and verified-capabili
   assert.equal(resolveMarketProviderSelection({ UNUSUAL_WHALES_TOKEN: "uw-token", RISK_STORY_MARKET_PROVIDER: "unusual-whales", RISK_STORY_UW_CAPABILITIES: "verified" }), "unusual-whales");
   assert.equal(getUnusualWhalesProvider({}), null);
   assert.equal(getUnusualWhalesProvider({ UNUSUAL_WHALES_TOKEN: "uw-token" })?.constructor.name, "UnusualWhalesProvider");
+});
+
+test("UW internal capability probe remains closed unless the explicit server-side gate is enabled", async () => {
+  let requests = 0;
+  const disabled = await getUnusualWhalesCapabilityProbeResponse(
+    { UNUSUAL_WHALES_TOKEN: "uw-secret-never-log" },
+    async () => {
+      requests += 1;
+      return new Response();
+    },
+  );
+  assert.equal(isUnusualWhalesCapabilityProbeEnabled({}), false);
+  assert.deepEqual(disabled, { status: "disabled", authentication: "not-attempted", results: [] });
+  assert.equal(requests, 0);
+});
+
+test("UW internal capability probe returns only safe summary fields and stops after authentication failure", async () => {
+  const token = "uw-secret-never-log";
+  let requests = 0;
+  const summary = await getUnusualWhalesCapabilityProbeResponse(
+    { UW_CAPABILITY_PROBE_ENABLED: "true", UNUSUAL_WHALES_TOKEN: token },
+    async () => {
+      requests += 1;
+      return new Response(JSON.stringify({ code: "forbidden", message: `Bearer ${token} is not entitled` }), { status: 403 });
+    },
+  );
+  const serialized = JSON.stringify(summary);
+  assert.equal(summary.status, "completed");
+  assert.equal(summary.authentication, "fail");
+  assert.equal(summary.results.length, 1);
+  assert.equal(summary.results[0].upstreamStatus, 403);
+  assert.deepEqual(summary.results[0].availableFields, []);
+  assert.equal(requests, 1);
+  assert.match(serialized, /Bearer \[REDACTED\]/);
+  assert.doesNotMatch(serialized, /uw-secret-never-log/);
+});
+
+test("UW internal capability probe exposes mapped field names without payload values", async () => {
+  const summary = await getUnusualWhalesCapabilityProbeResponse(
+    { UW_CAPABILITY_PROBE_ENABLED: "true", UNUSUAL_WHALES_TOKEN: "uw-secret-never-log" },
+    async (input) => {
+      const url = String(input);
+      if (url.includes("stock-state")) return new Response(JSON.stringify({ data: { close: 610.25, tape_time: "2026-08-13T14:30:00Z" } }));
+      return new Response(JSON.stringify({ data: [] }));
+    },
+  );
+  const stockState = summary.results.find((result) => result.capability === "stock-state");
+  assert.equal(summary.authentication, "pass");
+  assert.deepEqual(stockState?.availableFields, ["close", "tapeTime"]);
+  assert.doesNotMatch(JSON.stringify(summary), /610\.25|uw-secret-never-log/);
 });

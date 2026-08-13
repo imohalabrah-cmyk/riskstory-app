@@ -6,11 +6,12 @@ type Props = { market: MarketRead | null; loading: boolean };
 export function Dashboard({ market, loading }: Props) {
   const available = market?.provenance.mode !== "unavailable";
   const metrics = available ? market?.metrics : undefined;
+  const gexSource = metrics?.netGex.method === "reported" ? "Provider-native" : metrics?.netGex.method === "derived" ? "Chain-derived" : "Unavailable";
   const values = [
     ["Spot", metrics?.spot.value ?? null, "green", available ? market?.symbol ?? "--" : "Unavailable", price],
-    ["Net GEX", metrics?.netGex.value ?? 0, "green", "Chain-derived", money],
-    ["Call GEX", metrics?.callGex.value ?? 0, "green", "Chain-derived", money],
-    ["Put GEX", metrics?.putGex.value ?? 0, "red", "Chain-derived", money],
+    ["Net GEX", metrics?.netGex.value ?? 0, "green", gexSource, money],
+    ["Call GEX", metrics?.callGex.value ?? 0, "green", gexSource, money],
+    ["Put GEX", metrics?.putGex.value ?? 0, "red", gexSource, money],
     ["Zero Gamma", metrics?.zeroGamma.value ?? null, "yellow", available ? market?.range ?? "0DTE" : "Unavailable", price],
     ["Call Wall", metrics?.callWall.value ?? 0, "cyan", "Resistance", price],
     ["Put Wall", metrics?.putWall.value ?? 0, "red", "Support", price],

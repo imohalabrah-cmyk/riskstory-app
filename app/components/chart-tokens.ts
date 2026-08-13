@@ -19,4 +19,5 @@ export const CHART_COLORS = {
   gexNegative: "#e97882",
   gexPositiveLine: "rgba(74, 164, 245, .55)",
   gexNegativeLine: "rgba(233, 120, 130, .55)",
+  darkPool: "rgba(88, 193, 235, .68)",
 } as const;

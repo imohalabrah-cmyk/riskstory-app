@@ -16,6 +16,7 @@
     "test:marketdata-observability": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/marketdata-observability.test.js",
     "test:unusual-whales-readiness": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/unusual-whales-readiness.test.js",
     "test:unusual-whales-market-provider": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/unusual-whales-market-provider.test.js",
+    "test:chart-overlays": "tsc -p tsconfig.gex-intelligence-test.json && node --test .test-build/tests/chart-overlay-data.test.js",
     "build:cloudflare": "opennextjs-cloudflare build && node scripts/patch-opennext-worker.mjs",
     "preview": "npm run build:cloudflare && opennextjs-cloudflare preview",
     "deploy": "npm run build:cloudflare && opennextjs-cloudflare deploy",

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import type { CandlestickData, HistogramData, IChartApi, IPriceLine, ISeriesApi, Time } from "lightweight-charts";
-import type { Candle, ExposureStrike, MarketRead } from "../lib/market/types";
+import type { Candle, FlowRead, MarketRead } from "../lib/market/types";
+import { selectDarkPoolZones, selectFlowOverlayEvents, selectGexZones } from "../lib/chart/overlay-data";
 import { CHART_COLORS } from "./chart-tokens";
 
 type GexMode = "off" | "bubbles" | "levels" | "both";
@@ -13,10 +14,13 @@ type Props = {
   hasMoreCandles: boolean;
   onLoadOlderCandles?: (before: number) => Promise<void>;
   market: MarketRead;
+  flow: FlowRead | null;
   drawMode: boolean;
   drawings: number[];
   onAddDrawing: (price: number) => void;
   gexMode: GexMode;
+  showDarkPool: boolean;
+  showFlow: boolean;
   showLevels: boolean;
   showVolume: boolean;
   showGrid: boolean;
@@ -28,7 +32,8 @@ type Props = {
 
 type CandleSeries = ISeriesApi<"Candlestick">;
 type VolumeSeries = ISeriesApi<"Histogram">;
-type Bubble = { key: string; left: number; top: number; size: number; color: string; label: string };
+type BubbleZone = { key: string; left: number; top: number; count: number; size: number; color: string; label: string };
+type FlowMarker = { key: string; left: number; top: number; color: string; label: string };
 
 function chartCandles(candles: Candle[]): CandlestickData<Time>[] {
   return candles.map((candle) => ({ ...candle, time: candle.time as Time }));
@@ -42,32 +47,26 @@ function volumeBars(candles: Candle[]): HistogramData<Time>[] {
   }));
 }
 
-function gexRows(market: MarketRead): ExposureStrike[] {
-  return (market.exposure?.rows ?? [])
-    .filter((row) => Number.isFinite(row.strike) && Number.isFinite(row.netGex) && Math.abs(row.netGex) > 0)
-    .sort((a, b) => Math.abs(b.netGex) - Math.abs(a.netGex))
-    .slice(0, 9);
-}
-
 function equivalentTimeline(previous: Candle[], next: Candle[]) {
   if (previous.length !== next.length) return false;
   return previous.slice(0, -1).every((candle, index) => candle.time === next[index]?.time);
 }
 
-function sameBubbleLayout(current: Bubble[], next: Bubble[]) {
+function sameBubbleLayout(current: BubbleZone[], next: BubbleZone[]) {
   return current.length === next.length && current.every((bubble, index) => {
     const candidate = next[index];
-    return bubble.key === candidate?.key && Math.abs(bubble.left - candidate.left) < .5 && Math.abs(bubble.top - candidate.top) < .5 && bubble.size === candidate.size;
+    return bubble.key === candidate?.key && Math.abs(bubble.left - candidate.left) < .5 && Math.abs(bubble.top - candidate.top) < .5 && bubble.size === candidate.size && bubble.count === candidate.count;
   });
 }
 
-export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, market, drawMode, drawings, onAddDrawing, gexMode, showLevels, showVolume, showGrid, showCrosshair, selectedStrike, fitNonce, onCrosshairCandle }: Props) {
+export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, market, flow, drawMode, drawings, onAddDrawing, gexMode, showDarkPool, showFlow, showLevels, showVolume, showGrid, showCrosshair, selectedStrike, fitNonce, onCrosshairCandle }: Props) {
   const mount = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<CandleSeries | null>(null);
   const volumeRef = useRef<VolumeSeries | null>(null);
   const levelLinesRef = useRef<IPriceLine[]>([]);
   const gexLinesRef = useRef<IPriceLine[]>([]);
+  const darkPoolLinesRef = useRef<IPriceLine[]>([]);
   const drawingLinesRef = useRef<IPriceLine[]>([]);
   const selectedLineRef = useRef<IPriceLine | null>(null);
   const previousCandlesRef = useRef<Candle[]>([]);
@@ -76,9 +75,12 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
   const onCrosshairCandleRef = useRef(onCrosshairCandle);
   const latestCandlesRef = useRef(candles);
   const latestMarketRef = useRef(market);
+  const latestFlowRef = useRef(flow);
   const latestDrawingsRef = useRef(drawings);
   const selectedStrikeRef = useRef(selectedStrike);
   const gexModeRef = useRef<GexMode>(gexMode);
+  const showDarkPoolRef = useRef(showDarkPool);
+  const showFlowRef = useRef(showFlow);
   const showLevelsRef = useRef(showLevels);
   const showVolumeRef = useRef(showVolume);
   const showGridRef = useRef(showGrid);
@@ -89,7 +91,8 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
   const visibleRangeHandlerRef = useRef<((range: { from: number; to: number } | null) => void) | null>(null);
   const frameRef = useRef<number | null>(null);
   const lastCrosshairTimeRef = useRef<number | null>(null);
-  const [bubbles, setBubbles] = useState<Bubble[]>([]);
+  const [bubbles, setBubbles] = useState<BubbleZone[]>([]);
+  const [flowMarkers, setFlowMarkers] = useState<FlowMarker[]>([]);
 
   const clearLines = useCallback((lines: MutableRefObject<IPriceLine[]>) => {
     const series = seriesRef.current;
@@ -110,13 +113,12 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
         setBubbles([]);
         return;
       }
-      const rows = gexRows(latestMarketRef.current);
+      const rows = selectGexZones(latestMarketRef.current);
       const chartCandles = latestCandlesRef.current;
       if (!rows.length || !chartCandles.length) {
         setBubbles([]);
         return;
       }
-      const maximum = Math.max(...rows.map((row) => Math.abs(row.netGex)), 1);
       const currentCandle = chartCandles.at(-1);
       if (!currentCandle) {
         setBubbles([]);
@@ -130,18 +132,29 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
       const next = rows.flatMap((row) => {
         const top = series.priceToCoordinate(row.strike);
         if (top === null || top < 0 || top > container.clientHeight) return [];
-        const ratio = Math.abs(row.netGex) / maximum;
-        const size = Math.round(9 + Math.sqrt(ratio) * 12);
+        const size = Math.round(5 + Math.sqrt(row.intensity) * 3);
         return [{
           key: `current-${row.strike}-${row.netGex}`,
-          left,
+          left: left + 12,
           top,
           size,
-          color: row.netGex >= 0 ? (ratio > .75 ? CHART_COLORS.gexStrong : CHART_COLORS.gexPositive) : CHART_COLORS.gexNegative,
-          label: `Current GEX ${row.netGex >= 0 ? "positive" : "negative"} ${row.strike.toLocaleString("en-US")}`,
+          count: row.bubbleCount,
+          color: row.netGex >= 0 ? (row.intensity > .75 ? CHART_COLORS.gexStrong : CHART_COLORS.gexPositive) : CHART_COLORS.gexNegative,
+          label: `Current GEX zone. Strike ${row.strike.toLocaleString("en-US")}. GEX ${row.netGex.toLocaleString("en-US")}. Call OI ${row.callOpenInterest ?? "N/A"}. Put OI ${row.putOpenInterest ?? "N/A"}. Call volume ${row.callVolume ?? "N/A"}. Put volume ${row.putVolume ?? "N/A"}.`,
         }];
       });
       setBubbles((current) => sameBubbleLayout(current, next) ? current : next);
+      if (!showFlowRef.current) {
+        setFlowMarkers((current) => current.length ? [] : current);
+        return;
+      }
+      const events = selectFlowOverlayEvents(latestFlowRef.current, latestMarketRef.current.snapshot.spot);
+      const nextEvents = events.flatMap((event, index) => {
+        const top = series.priceToCoordinate(event.strike);
+        if (top === null || top < 0 || top > container.clientHeight) return [];
+        return [{ key: `${event.strike}-${event.premium}-${event.executedAt ?? index}`, left: Math.max(42, left - 82 - index * 14), top, color: event.side === "put" ? CHART_COLORS.gexNegative : CHART_COLORS.gexStrong, label: `Flow event. Strike ${event.strike.toLocaleString("en-US")}. Premium ${event.premium.toLocaleString("en-US")}. ${event.tags.length ? `Provider tags: ${event.tags.join(", ")}.` : "No provider classification."}` }];
+      });
+      setFlowMarkers(nextEvents);
     });
   }, []);
 
@@ -202,13 +215,28 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
     if (!series) return;
     clearLines(gexLinesRef);
     if (mode !== "levels" && mode !== "both") return;
-    gexLinesRef.current = gexRows(nextMarket).slice(0, 5).map((row) => series.createPriceLine({
+    gexLinesRef.current = selectGexZones(nextMarket).map((row) => series.createPriceLine({
       price: row.strike,
       color: row.netGex >= 0 ? CHART_COLORS.gexPositiveLine : CHART_COLORS.gexNegativeLine,
       lineWidth: 1,
       lineStyle: 1 as never,
       axisLabelVisible: false,
-      title: "GEX model",
+      title: "GEX zone",
+    }));
+  }, [clearLines]);
+
+  const syncDarkPoolLevels = useCallback((nextFlow: FlowRead | null, visible: boolean) => {
+    const series = seriesRef.current;
+    if (!series) return;
+    clearLines(darkPoolLinesRef);
+    if (!visible) return;
+    darkPoolLinesRef.current = selectDarkPoolZones(nextFlow).map((zone) => series.createPriceLine({
+      price: zone.price,
+      color: CHART_COLORS.darkPool,
+      lineWidth: 1,
+      lineStyle: 2 as never,
+      axisLabelVisible: true,
+      title: `DP ${zone.darkPoolVolume.toLocaleString("en-US")}`,
     }));
   }, [clearLines]);
 
@@ -244,6 +272,11 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
     scheduleBubbleSync();
   }, [market, scheduleBubbleSync, syncGexLevels, syncMarketLevels]);
   useEffect(() => {
+    latestFlowRef.current = flow;
+    syncDarkPoolLevels(flow, showDarkPoolRef.current);
+    scheduleBubbleSync();
+  }, [flow, scheduleBubbleSync, syncDarkPoolLevels]);
+  useEffect(() => {
     latestDrawingsRef.current = drawings;
     syncDrawings(drawings);
   }, [drawings, syncDrawings]);
@@ -256,6 +289,14 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
     syncGexLevels(latestMarketRef.current, gexMode);
     scheduleBubbleSync();
   }, [gexMode, scheduleBubbleSync, syncGexLevels]);
+  useEffect(() => {
+    showDarkPoolRef.current = showDarkPool;
+    syncDarkPoolLevels(latestFlowRef.current, showDarkPool);
+  }, [showDarkPool, syncDarkPoolLevels]);
+  useEffect(() => {
+    showFlowRef.current = showFlow;
+    scheduleBubbleSync();
+  }, [showFlow, scheduleBubbleSync]);
   useEffect(() => {
     showLevelsRef.current = showLevels;
     syncMarketLevels(latestMarketRef.current, showLevels);
@@ -312,6 +353,7 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
       syncCandles(latestCandlesRef.current);
       syncMarketLevels(latestMarketRef.current, showLevelsRef.current);
       syncGexLevels(latestMarketRef.current, gexModeRef.current);
+      syncDarkPoolLevels(latestFlowRef.current, showDarkPoolRef.current);
       syncDrawings(latestDrawingsRef.current);
       syncSelectedStrike(selectedStrikeRef.current);
       chart.timeScale().fitContent();
@@ -358,14 +400,16 @@ export function InteractiveChart({ candles, hasMoreCandles, onLoadOlderCandles, 
       volumeRef.current = null;
       levelLinesRef.current = [];
       gexLinesRef.current = [];
+      darkPoolLinesRef.current = [];
       drawingLinesRef.current = [];
       selectedLineRef.current = null;
     };
-  }, [scheduleBubbleSync, syncCandles, syncDrawings, syncGexLevels, syncMarketLevels, syncSelectedStrike]);
+  }, [scheduleBubbleSync, syncCandles, syncDarkPoolLevels, syncDrawings, syncGexLevels, syncMarketLevels, syncSelectedStrike]);
 
   return <div ref={mount} className={drawMode ? "interactiveChart drawMode" : "interactiveChart"} aria-label={`${market.symbol} interactive price chart`}>
     <div className="gexBubbleLayer" aria-label="GEX bubbles">
-      {bubbles.map((bubble) => <span key={bubble.key} className="gexBubble" title={bubble.label} aria-label={bubble.label} style={{ left: bubble.left, top: bubble.top, width: bubble.size, height: bubble.size, backgroundColor: bubble.color }} />)}
+      {bubbles.map((bubble) => <span key={bubble.key} className="gexBubbleZone" title={bubble.label} aria-label={bubble.label} style={{ left: bubble.left, top: bubble.top, "--bubble-color": bubble.color } as React.CSSProperties}>{Array.from({ length: bubble.count }, (_, index) => <i key={index} className="gexBubble" style={{ width: bubble.size, height: bubble.size }} />)}</span>)}
+      {flowMarkers.map((marker) => <span key={marker.key} className="flowMarker" title={marker.label} style={{ left: marker.left, top: marker.top, "--flow-color": marker.color } as React.CSSProperties}>Flow</span>)}
     </div>
   </div>;
 }

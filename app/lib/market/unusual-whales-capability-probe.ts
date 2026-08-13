@@ -3,6 +3,28 @@ import type { UnusualWhalesCapability, UnusualWhalesCapabilityResult } from "./u
 
 type ProbeStep = { capability: UnusualWhalesCapability; endpoint: string; run: () => Promise<unknown> };
 
+export type UnusualWhalesCapabilitySummary = UnusualWhalesCapabilityResult & {
+  availableFields: string[];
+};
+
+type ProbeOptions = {
+  stopOnAuthenticationFailure?: boolean;
+  includeAvailableFields?: boolean;
+};
+
+function availableFields(payload: unknown) {
+  const value = Array.isArray(payload)
+    ? payload.find((row) => row && typeof row === "object" && !Array.isArray(row))
+    : payload;
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+
+  return Object.entries(value as Record<string, unknown>)
+    .filter(([, fieldValue]) => fieldValue !== null && fieldValue !== undefined)
+    .map(([field]) => field)
+    .sort();
+}
+
 export function unusualWhalesProbePlan(client: UnusualWhalesClient): ProbeStep[] {
   // The chain response is the OI capability probe. No redundant OI endpoint is called.
   return [
@@ -20,16 +42,37 @@ export function unusualWhalesProbePlan(client: UnusualWhalesClient): ProbeStep[]
   ];
 }
 
-export async function runUnusualWhalesCapabilityProbe(client: UnusualWhalesClient) {
-  const results: UnusualWhalesCapabilityResult[] = [];
+export async function runUnusualWhalesCapabilityProbe(
+  client: UnusualWhalesClient,
+  options: ProbeOptions = {},
+): Promise<UnusualWhalesCapabilityResult[] | UnusualWhalesCapabilitySummary[]> {
+  const results: (UnusualWhalesCapabilityResult | UnusualWhalesCapabilitySummary)[] = [];
   for (const step of unusualWhalesProbePlan(client)) {
     try {
-      await step.run();
-      results.push({ capability: step.capability, status: "available", endpoint: step.endpoint, upstreamStatus: null, code: null, message: null });
+      const payload = await step.run();
+      const result = { capability: step.capability, status: "available" as const, endpoint: step.endpoint, upstreamStatus: null, code: null, message: null };
+      results.push(options.includeAvailableFields ? { ...result, availableFields: availableFields(payload) } : result);
     } catch (error) {
       const upstream = error instanceof UnusualWhalesUpstreamError ? error : null;
-      results.push({ capability: step.capability, status: "unavailable", endpoint: step.endpoint, upstreamStatus: upstream?.status ?? null, code: upstream?.code ?? null, message: upstream?.message ?? "Unusual Whales capability request failed" });
+      const result = {
+        capability: step.capability,
+        status: "unavailable" as const,
+        endpoint: step.endpoint,
+        upstreamStatus: upstream?.status ?? null,
+        code: upstream?.code ?? null,
+        message: upstream?.message ?? "Unusual Whales capability request failed",
+      };
+      results.push(options.includeAvailableFields ? { ...result, availableFields: [] } : result);
+
+      if (options.stopOnAuthenticationFailure && (upstream?.status === 401 || upstream?.status === 403)) break;
     }
   }
-  return results;
+  return results as UnusualWhalesCapabilityResult[] | UnusualWhalesCapabilitySummary[];
+}
+
+export async function runUnusualWhalesCapabilitySummary(client: UnusualWhalesClient) {
+  return runUnusualWhalesCapabilityProbe(client, {
+    stopOnAuthenticationFailure: true,
+    includeAvailableFields: true,
+  }) as Promise<UnusualWhalesCapabilitySummary[]>;
 }

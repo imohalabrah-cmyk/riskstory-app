@@ -30,6 +30,7 @@
     "app/lib/market/unusual-whales-types.ts",
     "app/lib/market/unusual-whales-provider.ts",
     "app/lib/market/unusual-whales-capability-probe.ts",
+    "app/lib/market/unusual-whales-capability-endpoint.ts",
     "app/lib/market/unavailable-provider.ts"
   ]
 }

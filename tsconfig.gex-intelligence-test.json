@@ -19,6 +19,7 @@
     "tests/marketdata-observability.test.ts",
     "tests/unusual-whales-readiness.test.ts",
     "tests/unusual-whales-market-provider.test.ts",
+    "tests/chart-overlay-data.test.ts",
     "app/lib/gex-intelligence/**/*.ts",
     "app/lib/gex-curve/**/*.ts",
     "app/lib/open-interest-studio/**/*.ts",
@@ -31,6 +32,7 @@
     "app/lib/market/unusual-whales-types.ts",
     "app/lib/market/unusual-whales-provider.ts",
     "app/lib/market/unusual-whales-market-provider.ts",
+    "app/lib/chart/overlay-data.ts",
     "app/lib/market/unusual-whales-capability-probe.ts",
     "app/lib/market/unusual-whales-capability-endpoint.ts",
     "app/lib/market/unavailable-provider.ts"

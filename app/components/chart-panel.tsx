@@ -20,7 +20,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import type { Candle, CandleRead, MarketRead } from "../lib/market/types";
+import type { Candle, CandleRead, FlowRead, MarketRead } from "../lib/market/types";
 import { InteractiveChart } from "./interactive-chart";
 import { Panel } from "./panel";
 import { classNames, price } from "./utils";
@@ -33,6 +33,7 @@ type Props = {
   title?: string;
   market: MarketRead | null;
   candles: CandleRead | null;
+  flow?: FlowRead | null;
   range: string;
   onRange: (range: string) => void;
   frame: string;
@@ -43,11 +44,13 @@ type Props = {
 
 const frames = ["1m", "5m", "10m", "15m", "1h", "1D"];
 
-export function ChartPanel({ title = "Chart With Levels", market, candles, range, onRange, frame, onFrame, onLoadOlderCandles, onExpand }: Props) {
+export function ChartPanel({ title = "Chart With Levels", market, candles, flow = null, range, onRange, frame, onFrame, onLoadOlderCandles, onExpand }: Props) {
   const availableMarket = market?.provenance.mode === "unavailable" ? null : market;
   const [drawMode, setDrawMode] = useState(false);
   const [drawings, setDrawings] = useState<number[]>([]);
   const [gexMode, setGexMode] = useState<GexMode>("bubbles");
+  const [showDarkPool, setShowDarkPool] = useState(true);
+  const [showFlow, setShowFlow] = useState(true);
   const [showLevels, setShowLevels] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
@@ -133,6 +136,9 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
     ["Call wall", availableMarket.snapshot.callWall, "call"], ["Zero gamma", availableMarket.snapshot.zeroGamma, "zero"], ["Spot", availableMarket.snapshot.spot, "spot"], ["Put wall", availableMarket.snapshot.putWall, "put"],
   ] as const : [["Call wall", null, "call"], ["Zero gamma", null, "zero"], ["Spot", null, "spot"], ["Put wall", null, "put"]] as const;
   const hasGex = Boolean(availableMarket?.exposure?.rows.length);
+  const hasDarkPool = Boolean(flow?.raw?.darkPoolPriceLevels.some((level) => level.price !== null && level.darkPoolVolume !== null));
+  const hasFlow = Boolean(flow?.raw?.optionTrades.some((trade) => trade.strike !== null && trade.premium !== null));
+  const providerNativeGex = availableMarket?.provider === "unusual-whales";
   const canUndo = drawings.length > 0;
   const activeCandle = selectedCandle ?? candles?.candles.at(-1) ?? null;
   const selectedStrike = resolveLinkedStrike(selection, { symbol: availableMarket?.symbol, strikes: selection.strike === null ? [] : [selection.strike] });
@@ -147,6 +153,8 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
         </div>
         <label className="chartSelectLabel rangeControl">Range<select className="chartSelect" value={range} onChange={(event) => onRange(event.target.value)} aria-label="Expiration range"><option>0DTE</option><option>Daily</option><option>Weekly</option><option>Custom</option></select></label>
         <label className="chartSelectLabel gexControl">GEX<select className="chartSelect" value={gexMode} onChange={(event) => setGexMode(event.target.value as GexMode)} disabled={!hasGex} aria-label="GEX overlay"><option value="off">Off</option><option value="bubbles">Bubbles</option><option value="levels">Levels</option><option value="both">Both</option></select></label>
+        <button type="button" className={classNames("toolButton", showDarkPool && "active")} onClick={() => setShowDarkPool((value) => !value)} disabled={!hasDarkPool} aria-pressed={showDarkPool} title={hasDarkPool ? "Toggle provider-backed dark-pool levels" : "Dark-pool levels unavailable"}>Dark Pool</button>
+        <button type="button" className={classNames("toolButton", showFlow && "active")} onClick={() => setShowFlow((value) => !value)} disabled={!hasFlow} aria-pressed={showFlow} title={hasFlow ? "Toggle provider-backed flow events" : "Flow events unavailable"}>Flow</button>
         <div className="chartSettings">
           <button ref={dataButtonRef} type="button" className={classNames("toolButton", "dataStatusControl", dataOpen && "active")} onClick={() => setDataOpen((current) => !current)} aria-expanded={dataOpen} aria-label="Data overlay status"><Layers3 size={14} /><span>Data</span></button>
         </div>
@@ -164,14 +172,14 @@ export function ChartPanel({ title = "Chart With Levels", market, candles, range
       <div className="chartStage">
         <div className="chartCanvas">
           {showDrawingTools && <div className="drawingToolbar" aria-label="Drawing tools"><button type="button" className={classNames("iconTool", drawMode && "active")} onClick={() => setDrawMode((value) => !value)} aria-label="Draw horizontal line" title="Horizontal line"><PencilLine size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings((current) => current.slice(0, -1))} disabled={!canUndo} aria-label="Undo drawing" title="Undo"><Undo2 size={16} /></button><button type="button" className="iconTool" onClick={() => setDrawings([])} disabled={!canUndo} aria-label="Clear drawings" title="Clear"><Trash2 size={16} /></button></div>}
-          {!availableMarket || !candles?.candles.length ? <div className="surfaceEmpty"><strong>Chart data unavailable</strong><span>Sync the market feed to load provider-backed candles.</span></div> : <InteractiveChart market={availableMarket} candles={candles.candles} hasMoreCandles={candles.pagination?.hasMore ?? false} onLoadOlderCandles={onLoadOlderCandles} drawMode={drawMode} drawings={drawings} onAddDrawing={addDrawing} gexMode={gexMode} showLevels={showLevels} showVolume={showVolume} showGrid={showGrid} showCrosshair={showCrosshair} selectedStrike={selectedStrike} fitNonce={fitNonce} onCrosshairCandle={setSelectedCandle} />}
+          {!availableMarket || !candles?.candles.length ? <div className="surfaceEmpty"><strong>Chart data unavailable</strong><span>Sync the market feed to load provider-backed candles.</span></div> : <InteractiveChart market={availableMarket} flow={flow} candles={candles.candles} hasMoreCandles={candles.pagination?.hasMore ?? false} onLoadOlderCandles={onLoadOlderCandles} drawMode={drawMode} drawings={drawings} onAddDrawing={addDrawing} gexMode={gexMode} showDarkPool={showDarkPool} showFlow={showFlow} showLevels={showLevels} showVolume={showVolume} showGrid={showGrid} showCrosshair={showCrosshair} selectedStrike={selectedStrike} fitNonce={fitNonce} onCrosshairCandle={setSelectedCandle} />}
         </div>
-        <aside className="levels"><label>Market levels</label>{levels.map(([name, value, kind]) => <div className={`level ${kind}`} key={name}><i /><div><b>{value === null ? "N/A" : price(value)}</b><small>{name}</small></div></div>)}<p className="levelSource">GEX overlay uses model-calculated chain exposure when available.</p></aside>
+        <aside className="levels"><label>Market levels</label>{levels.map(([name, value, kind]) => <div className={`level ${kind}`} key={name}><i /><div><b>{value === null ? "N/A" : price(value)}</b><small>{name}</small></div></div>)}<p className="levelSource">{providerNativeGex ? "Unusual Whales provider-native GEX levels and signs." : "Provider-backed chain GEX levels when available."}</p></aside>
       </div>
     </div>
   </Panel>
-  {dataOpen && dataPosition && createPortal(<div ref={dataPopoverRef} className="chartPopover dataPopover chartFloatingPopover" style={dataPosition} role="dialog" aria-label="Data overlay status"><strong>Data overlays</strong><DataStatus label="Dark Pool" reason="No dark-pool levels are supplied by the connected provider." /><DataStatus label="Flow" reason="Flow rows do not include chart-safe event timestamps." /><DataStatus label="Whales" reason="Whale classifications are not supplied by the connected provider." /></div>, document.body)}
-  {settingsOpen && createPortal(<ChartSettingsModal closeButtonRef={settingsCloseButtonRef} onClose={() => setSettingsOpen(false)} showLevels={showLevels} setShowLevels={setShowLevels} showVolume={showVolume} setShowVolume={setShowVolume} showGrid={showGrid} setShowGrid={setShowGrid} showCrosshair={showCrosshair} setShowCrosshair={setShowCrosshair} showDrawingTools={showDrawingTools} setShowDrawingTools={setShowDrawingTools} />, document.body)}
+  {dataOpen && dataPosition && createPortal(<div ref={dataPopoverRef} className="chartPopover dataPopover chartFloatingPopover" style={dataPosition} role="dialog" aria-label="Data overlay status"><strong>Data overlays</strong><DataStatus label="GEX" available={hasGex} reason={hasGex ? providerNativeGex ? "Provider-native Unusual Whales GEX signs are active." : "Provider-backed chain GEX is active." : "No provider-backed GEX rows returned."} /><DataStatus label="Dark Pool" available={hasDarkPool} reason={hasDarkPool ? "Provider-backed dark-pool price levels are available." : "No provider-backed dark-pool level is available."} /><DataStatus label="Flow" available={hasFlow} reason={hasFlow ? "Provider-backed raw flow events are available." : "No chart-safe raw flow event is available."} /></div>, document.body)}
+  {settingsOpen && createPortal(<ChartSettingsModal closeButtonRef={settingsCloseButtonRef} onClose={() => setSettingsOpen(false)} showLevels={showLevels} setShowLevels={setShowLevels} showDarkPool={showDarkPool} setShowDarkPool={setShowDarkPool} darkPoolAvailable={hasDarkPool} showFlow={showFlow} setShowFlow={setShowFlow} flowAvailable={hasFlow} showVolume={showVolume} setShowVolume={setShowVolume} showGrid={showGrid} setShowGrid={setShowGrid} showCrosshair={showCrosshair} setShowCrosshair={setShowCrosshair} showDrawingTools={showDrawingTools} setShowDrawingTools={setShowDrawingTools} />, document.body)}
   </>;
 }
 
@@ -179,8 +187,8 @@ function Toggle({ label, checked, onChange, icon }: { label: string; checked: bo
   return <label className="settingToggle"><span>{icon}{label}</span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /></label>;
 }
 
-function DataStatus({ label, reason }: { label: string; reason: string }) {
-  return <div className="dataStatus"><span>{label}</span><small>Unavailable - {reason}</small></div>;
+function DataStatus({ label, available, reason }: { label: string; available: boolean; reason: string }) {
+  return <div className="dataStatus"><span>{label}</span><small>{available ? "Available" : "Unavailable"} - {reason}</small></div>;
 }
 
 type ChartSettingsModalProps = {
@@ -188,6 +196,12 @@ type ChartSettingsModalProps = {
   onClose: () => void;
   showLevels: boolean;
   setShowLevels: (checked: boolean) => void;
+  showDarkPool: boolean;
+  setShowDarkPool: (checked: boolean) => void;
+  darkPoolAvailable: boolean;
+  showFlow: boolean;
+  setShowFlow: (checked: boolean) => void;
+  flowAvailable: boolean;
   showVolume: boolean;
   setShowVolume: (checked: boolean) => void;
   showGrid: boolean;
@@ -198,15 +212,15 @@ type ChartSettingsModalProps = {
   setShowDrawingTools: (checked: boolean) => void;
 };
 
-function ChartSettingsModal({ closeButtonRef, onClose, showLevels, setShowLevels, showVolume, setShowVolume, showGrid, setShowGrid, showCrosshair, setShowCrosshair, showDrawingTools, setShowDrawingTools }: ChartSettingsModalProps) {
+function ChartSettingsModal({ closeButtonRef, onClose, showLevels, setShowLevels, showDarkPool, setShowDarkPool, darkPoolAvailable, showFlow, setShowFlow, flowAvailable, showVolume, setShowVolume, showGrid, setShowGrid, showCrosshair, setShowCrosshair, showDrawingTools, setShowDrawingTools }: ChartSettingsModalProps) {
   return <div className="chartSettingsModalBackdrop" role="presentation" onMouseDown={onClose}>
     <section className="chartSettingsModal" role="dialog" aria-modal="true" aria-labelledby="chart-settings-title" onMouseDown={(event) => event.stopPropagation()}>
       <header><div><span>CHART SETTINGS</span><h2 id="chart-settings-title">Display and behavior</h2></div><button ref={closeButtonRef} type="button" className="iconTool" onClick={onClose} aria-label="Close chart settings"><X size={17} /></button></header>
       <div className="chartSettingsGrid">
         <section><h3>Market Levels</h3><Toggle label="Show Spot, Call Wall, Put Wall, and Zero Gamma" checked={showLevels} onChange={setShowLevels} icon={showLevels ? <Eye size={15} /> : <EyeOff size={15} />} /></section>
         <section><h3>GEX</h3><p>Use the toolbar control for Bubbles, Levels, Both, or Off. It stays disabled until provider-backed exposure is available.</p></section>
-        <section><h3>Dark Pool</h3><p>Unavailable until the connected provider returns dark-pool levels.</p></section>
-        <section><h3>Flow and Whales</h3><p>Unavailable until the provider returns chart-safe timestamps and classifications.</p></section>
+        <section><h3>Dark Pool</h3>{darkPoolAvailable ? <Toggle label="Provider-backed dark-pool levels" checked={showDarkPool} onChange={setShowDarkPool} icon={showDarkPool ? <Eye size={15} /> : <EyeOff size={15} />} /> : <p>No provider-backed dark-pool level is available in this read.</p>}</section>
+        <section><h3>Flow</h3>{flowAvailable ? <Toggle label="Provider-backed neutral flow events" checked={showFlow} onChange={setShowFlow} icon={showFlow ? <Eye size={15} /> : <EyeOff size={15} />} /> : <p>No chart-safe raw flow event is available in this read.</p>}</section>
         <section><h3>Appearance</h3><Toggle label="Volume histogram" checked={showVolume} onChange={setShowVolume} icon={<Volume2 size={15} />} /><Toggle label="Grid lines" checked={showGrid} onChange={setShowGrid} icon={<Grid3X3 size={15} />} /></section>
         <section><h3>Chart Behavior</h3><Toggle label="Crosshair" checked={showCrosshair} onChange={setShowCrosshair} icon={<Crosshair size={15} />} /><Toggle label="Drawing toolbar" checked={showDrawingTools} onChange={setShowDrawingTools} icon={<PencilLine size={15} />} /></section>
       </div>

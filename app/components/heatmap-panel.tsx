@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Minus, Plus, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
-import type { ExposureStrike, MarketRead } from "../lib/market/types";
+import type { ExpirationExposureStrike, MarketRead } from "../lib/market/types";
 import { combineReportedValues } from "../lib/market/reported-values";
 import { useIntelligenceSelection } from "../lib/intelligence/selection-context";
 import { resolveLinkedStrike, selectionMatchesSymbol } from "../lib/intelligence/selection-linking";
@@ -17,7 +17,7 @@ const ROW_HEIGHT = 42;
 const OVERSCAN = 7;
 
 function readableOi(value: number | null) { return value === null ? "N/A" : value >= 1000 ? `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}K` : String(Math.round(value)); }
-function sideValue(row: ExposureStrike, side: Side) { return side === "calls" ? row.callOpenInterest : side === "puts" ? row.putOpenInterest : combineReportedValues(row.callOpenInterest, row.putOpenInterest); }
+function sideValue(row: ExpirationExposureStrike, side: Side) { return side === "calls" ? row.callOpenInterest : side === "puts" ? row.putOpenInterest : combineReportedValues(row.callOpenInterest, row.putOpenInterest); }
 
 export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onExpand, onSymbol, compact = false }: Props) {
   const [side, setSide] = useState<Side>("combined");
@@ -35,7 +35,7 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
   const rows = useMemo(() => {
     if (!available) return [];
     const needle = Number(query);
-    const byStrike = new Map<number, ExposureStrike>();
+    const byStrike = new Map<number, ExpirationExposureStrike>();
     expirations.forEach((item) => item.rows.forEach((row) => byStrike.set(row.strike, row)));
     const candidates = [...byStrike.values()].sort((a, b) => b.strike - a.strike);
     if (!query || !Number.isFinite(needle)) return candidates;
@@ -65,12 +65,12 @@ export function HeatmapPanel({ market, title = "GEX Heatmap by Expiration", onEx
     if (!drag || !node) return;
     node.scrollLeft = drag.left - (event.clientX - drag.x); node.scrollTop = drag.top - (event.clientY - drag.y);
   };
-  const cell = (row: ExposureStrike, item: { expiration: string; rows: ExposureStrike[] }) => {
+  const cell = (row: ExpirationExposureStrike, item: { expiration: string; rows: ExpirationExposureStrike[] }) => {
     const target = expirationRows.get(item.expiration)?.get(row.strike);
     const value = target ? sideValue(target, side) : null;
     const max = scaleMode === "global" ? globalMax : expirationMax.get(item.expiration) ?? 1;
     const intensity = value === null ? .025 : Math.max(.025, Math.min(1, value / max));
-    const active = hovered?.strike === row.strike && hovered.expiration === item.expiration;
+    const active = hovered?.strike === row.strike && hovered?.expiration === item.expiration;
     const linked = linkedStrike === row.strike && (selection.expiration === null || selection.expiration === item.expiration);
     return <button key={item.expiration} type="button" className={classNames("heatCell", side, active && "hovered", linked && "selected")} style={{ "--heat-intensity": intensity } as React.CSSProperties} onMouseEnter={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onFocus={() => value !== null && setHovered({ strike: row.strike, expiration: item.expiration, value })} onMouseLeave={() => setHovered(null)} aria-label={`${item.expiration}, strike ${price(row.strike)}, ${readableOi(value)} open interest`}><span>{readableOi(value)}</span></button>;
   };

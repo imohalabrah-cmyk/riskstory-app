@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { selectDarkPoolZones, selectFlowOverlayEvents, selectGexZones } from "../app/lib/chart/overlay-data";
+import { describeExposureHorizon } from "../app/lib/chart/exposure-horizon";
 import type { FlowRead, MarketRead } from "../app/lib/market/types";
 
 function market(rows: Array<{ strike: number; netGex: number; oi?: number | null }>): MarketRead {
@@ -13,6 +14,12 @@ test("GEX zones are deterministic, suppress noise, and retain native signs", () 
   assert.equal(result[0].strike, 101);
   assert.equal(result.find((zone) => zone.strike === 99)?.netGex, -85);
   assert.ok(result.every((zone) => zone.bubbleCount >= 2 && zone.bubbleCount <= 8));
+  assert.equal(result[0].horizon.kind, "short-dated-focus");
+});
+
+test("exposure horizon describes current provider scope without inventing persistence", () => {
+  assert.equal(describeExposureHorizon({ symbol: "AAPL", range: "Weekly", exposure: { expirations: [{ expiration: "2026-08-21", rows: [] }, { expiration: "2026-08-28", rows: [] }] } }).kind, "multi-expiration-context");
+  assert.match(describeExposureHorizon({ symbol: "AAPL", range: "Weekly", exposure: { expirations: [{ expiration: "2026-08-21", rows: [] }] } }).detail, /not a historical persistence measure/);
 });
 
 test("dark-pool and flow overlay policies do not fabricate direction or missing values", () => {

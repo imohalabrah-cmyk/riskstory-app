@@ -1,5 +1,5 @@
 import { UnusualWhalesClient, UnusualWhalesUpstreamError } from "./unusual-whales-provider";
-import type { UnusualWhalesCapability, UnusualWhalesCapabilityResult } from "./unusual-whales-types";
+import type { UnusualWhalesCapability, UnusualWhalesCapabilityResult, UnusualWhalesGreekExposure, UnusualWhalesOptionContract } from "./unusual-whales-types";
 
 type ProbeStep = { capability: UnusualWhalesCapability; endpoint: string; run: () => Promise<unknown> };
 
@@ -75,4 +75,79 @@ export async function runUnusualWhalesCapabilitySummary(client: UnusualWhalesCli
     stopOnAuthenticationFailure: true,
     includeAvailableFields: true,
   }) as Promise<UnusualWhalesCapabilitySummary[]>;
+}
+
+export type UnusualWhalesClosureResult = Omit<UnusualWhalesCapabilitySummary, "capability"> & {
+  capability: UnusualWhalesCapability | "spxw-stock-state" | "spxw-option-chain" | "spy-option-chain-detailed" | "spy-gex-native-sample";
+  fieldPresence?: Record<string, boolean>;
+  gexSamples?: Array<Pick<UnusualWhalesGreekExposure, "strike" | "callGex" | "putGex">>;
+};
+
+const CHAIN_FIELDS = ["bid", "ask", "impliedVolatility", "delta", "gamma", "openInterest", "volume", "strike", "expiry", "side"] as const;
+
+function chainFieldPresence(rows: UnusualWhalesOptionContract[]) {
+  return Object.fromEntries(CHAIN_FIELDS.map((field) => [field, rows.some((row) => row[field] !== null)])) as Record<(typeof CHAIN_FIELDS)[number], boolean>;
+}
+
+function closureFailure(capability: string, endpoint: string, error: unknown): UnusualWhalesClosureResult {
+  const upstream = error instanceof UnusualWhalesUpstreamError ? error : null;
+  return {
+    capability: capability as UnusualWhalesClosureResult["capability"],
+    status: "unavailable",
+    endpoint,
+    upstreamStatus: upstream?.status ?? null,
+    code: upstream?.code ?? null,
+    message: upstream?.message ?? "Unusual Whales capability request failed",
+    availableFields: [],
+  };
+}
+
+async function closureStep<T>(
+  client: UnusualWhalesClient,
+  capability: string,
+  endpoint: string,
+  run: () => Promise<T>,
+  summarize: (value: T) => Pick<UnusualWhalesClosureResult, "availableFields" | "fieldPresence" | "gexSamples">,
+) {
+  try {
+    const value = await run();
+    return {
+      capability: capability as UnusualWhalesClosureResult["capability"],
+      status: "available" as const,
+      endpoint,
+      upstreamStatus: client.lastUpstreamStatus,
+      code: null,
+      message: null,
+      ...summarize(value),
+    } satisfies UnusualWhalesClosureResult;
+  } catch (error) {
+    return closureFailure(capability, endpoint, error);
+  }
+}
+
+/**
+ * A one-time follow-up for the Phase 16F gaps. It deliberately avoids every
+ * already-verified feed and makes exactly four sequential provider requests.
+ */
+export async function runUnusualWhalesClosureProbe(client: UnusualWhalesClient) {
+  const results: UnusualWhalesClosureResult[] = [];
+  const steps = [
+    () => closureStep(client, "spxw-stock-state", "/stock/SPXW/stock-state", () => client.stockState("SPXW"), (value) => ({ availableFields: availableFields(value) })),
+    () => closureStep(client, "spxw-option-chain", "/stock/SPXW/option-chains?greeks=true", () => client.optionChain("SPXW"), (value) => ({ availableFields: availableFields(value), fieldPresence: chainFieldPresence(value) })),
+    () => closureStep(client, "spy-option-chain-detailed", "/stock/SPY/option-chains?greeks=true", () => client.optionChain("SPY"), (value) => ({ availableFields: availableFields(value), fieldPresence: chainFieldPresence(value) })),
+    () => closureStep(client, "spy-gex-native-sample", "/stock/SPY/greek-exposure/strike", () => client.greekExposureByStrike("SPY"), (value) => ({
+      availableFields: availableFields(value),
+      gexSamples: value
+        .filter((row) => row.strike !== null && (row.callGex !== null || row.putGex !== null))
+        .slice(0, 3)
+        .map(({ strike, callGex, putGex }) => ({ strike, callGex, putGex })),
+    })),
+  ];
+
+  for (const step of steps) {
+    const result = await step();
+    results.push(result);
+    if (result.upstreamStatus === 401 || result.upstreamStatus === 403) break;
+  }
+  return results;
 }

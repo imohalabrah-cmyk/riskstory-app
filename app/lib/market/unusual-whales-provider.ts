@@ -65,6 +65,8 @@ export class UnusualWhalesUpstreamError extends Error {
 }
 
 export class UnusualWhalesProvider {
+  lastUpstreamStatus: number | null = null;
+
   constructor(private readonly token: string, private readonly request: UnusualWhalesFetch = fetch) {}
 
   private async get(path: string): Promise<JsonRecord> {
@@ -72,6 +74,7 @@ export class UnusualWhalesProvider {
       headers: { Accept: "application/json", Authorization: `Bearer ${this.token}` },
       cache: "no-store",
     });
+    this.lastUpstreamStatus = response.status;
     const body = await response.text();
     let data: JsonRecord = {};
     try {

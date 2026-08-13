@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { runUnusualWhalesCapabilityProbe, unusualWhalesProbePlan } from "../app/lib/market/unusual-whales-capability-probe";
+import { runUnusualWhalesCapabilityProbe, runUnusualWhalesClosureProbe, unusualWhalesProbePlan } from "../app/lib/market/unusual-whales-capability-probe";
 import { getUnusualWhalesCapabilityProbeResponse, isUnusualWhalesCapabilityProbeEnabled } from "../app/lib/market/unusual-whales-capability-endpoint";
 import { mapCandles, mapDarkPoolPriceLevels, mapDarkPoolTrades, mapGexLevels, mapGreekExposure, mapOptionChain, mapOptionTrades, mapStockState, UnusualWhalesClient } from "../app/lib/market/unusual-whales-provider";
 import { getUnusualWhalesProvider, resolveMarketProviderSelection } from "../app/lib/market/provider";
@@ -100,4 +100,28 @@ test("UW internal capability probe exposes mapped field names without payload va
   assert.equal(summary.authentication, "pass");
   assert.deepEqual(stockState?.availableFields, ["close", "tapeTime"]);
   assert.doesNotMatch(JSON.stringify(summary), /610\.25|uw-secret-never-log/);
+});
+
+test("UW closure probe makes four follow-up requests and preserves only native GEX samples", async () => {
+  const calls: string[] = [];
+  const client = new UnusualWhalesClient("uw-secret-never-log", async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("greek-exposure/strike")) return new Response(JSON.stringify({ data: [{ strike: 600, call_gex: 14, put_gex: -9 }] }));
+    if (url.includes("option-chains")) return new Response(JSON.stringify({ data: [{ strike: 600, expiry: "2026-08-14", type: "call", nbbo_bid: 1, nbbo_ask: 2, implied_volatility: 0.2, delta: 0.5, gamma: 0.01, open_interest: 0, volume: 10 }] }));
+    return new Response(JSON.stringify({ data: { close: 600 } }));
+  });
+  const results = await runUnusualWhalesClosureProbe(client);
+  assert.equal(calls.length, 4);
+  assert.deepEqual(results.map((result) => result.endpoint), [
+    "/stock/SPXW/stock-state",
+    "/stock/SPXW/option-chains?greeks=true",
+    "/stock/SPY/option-chains?greeks=true",
+    "/stock/SPY/greek-exposure/strike",
+  ]);
+  const spyChain = results.find((result) => result.capability === "spy-option-chain-detailed");
+  assert.deepEqual(spyChain?.fieldPresence, { bid: true, ask: true, impliedVolatility: true, delta: true, gamma: true, openInterest: true, volume: true, strike: true, expiry: true, side: true });
+  const gex = results.find((result) => result.capability === "spy-gex-native-sample");
+  assert.deepEqual(gex?.gexSamples, [{ strike: 600, callGex: 14, putGex: -9 }]);
+  assert.equal("netGex" in (gex?.gexSamples?.[0] || {}), false);
 });

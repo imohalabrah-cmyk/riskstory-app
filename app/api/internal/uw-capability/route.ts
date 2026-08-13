@@ -3,12 +3,13 @@ import { getUnusualWhalesCapabilityProbeResponse, isUnusualWhalesCapabilityProbe
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
   if (!isUnusualWhalesCapabilityProbeEnabled()) {
     return NextResponse.json({ status: "disabled" }, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
 
-  return NextResponse.json(await getUnusualWhalesCapabilityProbeResponse(), {
+  const mode = new URL(request.url).searchParams.get("mode") === "closure" ? "closure" : "full";
+  return NextResponse.json(await getUnusualWhalesCapabilityProbeResponse(process.env, fetch, mode), {
     headers: { "Cache-Control": "no-store" },
   });
 }
